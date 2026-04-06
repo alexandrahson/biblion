@@ -763,10 +763,10 @@ export default function BiblionApp() {
             {tab === "books" ? "The Stacks" : tab === "vocab" ? "Word Alcove" : "Settings"}
           </div>
         </div>
-        {tab === "books" && (
+        {tab === "books" && !selectedBook && !showSearch && !showMyLibrary && !showAddMenu && (
           <div style={{ display: "flex", gap: 8, marginBottom: 4, alignItems: "center" }}>
-            <button onClick={() => { setShowSearch(s => !s); setShowAddMenu(false); setShowMyLibrary(false); setSearchResults([]); setSearchQuery(""); }} style={{ width: 38, height: 38, borderRadius: 10, background: showSearch ? C.bgSurface : "transparent", color: showSearch ? C.accent : C.textMid, border: `1px solid ${showSearch ? C.accent : C.border}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>
-              {showSearch ? <IconClose /> : <IconSearch />}
+            <button onClick={() => { setShowSearch(true); setShowAddMenu(false); setShowMyLibrary(false); setSelectedShelf(null); setShelfVolumes([]); }} style={{ width: 38, height: 38, borderRadius: 10, background: "transparent", color: C.textMid, border: `1px solid ${C.border}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>
+              <IconSearch />
             </button>
             <button onClick={() => { setShowAddMenu(s => !s); setShowSearch(false); setShowMyLibrary(false); setSelectedShelf(null); setShelfVolumes([]); }} style={{ width: 38, height: 38, borderRadius: 10, background: showAddMenu ? C.bgSurface : `linear-gradient(135deg, ${C.rose}, #A86E73)`, color: showAddMenu ? C.rose : "#fff", border: showAddMenu ? `1px solid ${C.rose}` : "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: showAddMenu ? "none" : "0 2px 10px rgba(196,134,139,0.25)" }}>
               {showAddMenu ? <IconClose /> : <IconPlus />}
