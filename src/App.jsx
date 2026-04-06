@@ -161,7 +161,7 @@ const IconSearch = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="
 const IconClose = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>);
 const IconBookmark = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>);
 
-function splitIntoSentenceChunks(text, minSentences = 3, maxSentences = 5) {
+function splitIntoSentenceChunks(text, minSentences = 1, maxSentences = 5) {
   const cleaned = (text || "").replace(/\s+/g, " ").trim();
   if (!cleaned) return [];
   const sentences = cleaned.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g)?.map(s => s.trim()).filter(Boolean) || [];
@@ -445,7 +445,7 @@ export default function BiblionApp() {
       const currentChapterIdx = book.id === readerBook?.id ? readerChapterIdx : (store.get(`biblion-reader-${book.id}`)?.chapterIdx || 0);
       const chapter = rawChapters[currentChapterIdx] || rawChapters[0];
       const chapterText = chapter?.content || book.textContent.slice(0, 12000);
-      const chapterChunks = splitIntoSentenceChunks(chapterText, 3, 5);
+      const chapterChunks = splitIntoSentenceChunks(chapterText, 1, 5);
       const recentBodies = (store.get(`biblion-passage-history-${book.id}-${currentChapterIdx}`) || []).slice(0, 8);
       const sys = `You are Biblion, a literary curator in a dusty, candlelit bookshop. Choose one passage from the supplied chapter text and present it in 5 sentences or fewer. Do not repeat any prior passage if a distinct option exists. Respond ONLY in JSON: {"title":"","body":"","page_hint":"","reflection":""}`;
       const usr = `Give me one memorable passage from this exact chapter in 5 sentences or fewer. The reader is currently on chapter: "${chapter?.title || `Chapter ${currentChapterIdx + 1}`}". Prefer a chunk that has not been used recently.\n\nRecent passages to avoid:\n${recentBodies.join("\n---\n") || "None"}\n\nCandidate chunks:\n${chapterChunks.map((chunk, i) => `[Chunk ${i + 1}] ${chunk}`).join("\n\n") || chapterText}`;
