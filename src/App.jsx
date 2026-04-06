@@ -248,6 +248,9 @@ export default function BiblionApp() {
   const [insightType, setInsightType] = useState("key_idea");
   const [apiKey, setApiKey] = useState("");
   const [showKeyInput, setShowKeyInput] = useState(false);
+  const [apiBalanceInfo, setApiBalanceInfo] = useState(null);
+  const [checkingApiBalance, setCheckingApiBalance] = useState(false);
+  const [apiBalanceError, setApiBalanceError] = useState("");
   const fileInputRef = useRef(null);
   const dictInputRef = useRef(null);
   const [showSearch, setShowSearch] = useState(false);
@@ -393,6 +396,31 @@ export default function BiblionApp() {
       updateBook(bookId, { [editingField]: editValue.trim() });
     }
     cancelEditing();
+  };
+
+  const checkApiBalance = async () => {
+    if (!ensureApiKey()) return;
+    setCheckingApiBalance(true);
+    setApiBalanceError("");
+    try {
+      const res = await fetch("https://api.deepseek.com/user/balance", {
+        headers: { "Authorization": `Bearer ${apiKey}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error?.message || data?.message || "Could not check API balance.");
+      setApiBalanceInfo(data);
+    } catch (err) {
+      setApiBalanceInfo(null);
+      setApiBalanceError(err.message || "Could not check API balance.");
+    }
+    setCheckingApiBalance(false);
+  };
+
+  const balanceLooksLow = (info) => {
+    const total = parseFloat(info?.total_balance || "0");
+    if (info?.currency === "USD") return total < 5;
+    if (info?.currency === "CNY") return total < 35;
+    return total <= 0;
   };
 
   const searchGoogleBooks = async (query) => {
@@ -793,7 +821,6 @@ export default function BiblionApp() {
                 {selectedBook.author && <div style={{ fontSize: 13, color: C.textMid, marginTop: 4, fontStyle: "italic" }}>{selectedBook.author}</div>}
               </div>
             </div>
-            <div style={{ fontSize: 11, color: C.textDim, marginBottom: 12, paddingLeft: selectedBook.coverUrl ? 68 : 18 }} className="mono">{Math.round(selectedBook.textContent.length / 1000)}k chars</div>
             {editingField === "textPreview" ? (
               <div style={{ marginBottom: 22 }}>
                 <textarea
@@ -920,19 +947,50 @@ export default function BiblionApp() {
                     type="password"
                     placeholder="sk-..."
                     value={apiKey}
-                    onChange={e => setApiKey(e.target.value)}
+                    onChange={e => { setApiKey(e.target.value); setApiBalanceInfo(null); setApiBalanceError(""); }}
                   />
                   <button className="btn-primary" onClick={() => {
                     persist("biblion-api-key", apiKey);
+                    setApiBalanceInfo(null);
+                    setApiBalanceError("");
                     setShowKeyInput(false);
                   }} disabled={!apiKey} style={{ fontSize: 14 }}>
                     Save Key
                   </button>
                 </div>
               ) : (
-                <button className="btn-ghost" onClick={() => setShowKeyInput(true)} style={{ fontSize: 13 }}>
-                  Change Key
-                </button>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button className="btn-ghost" onClick={() => setShowKeyInput(true)} style={{ fontSize: 13 }}>
+                      Change Key
+                    </button>
+                    <button className="btn-primary" onClick={checkApiBalance} disabled={checkingApiBalance} style={{ fontSize: 13 }}>
+                      {checkingApiBalance ? "Checking Balance…" : "Check API Balance"}
+                    </button>
+                  </div>
+                  {apiBalanceError && (
+                    <div style={{ fontSize: 12, color: C.rose, lineHeight: 1.6 }} className="serif-body">{apiBalanceError}</div>
+                  )}
+                  {apiBalanceInfo?.balance_infos?.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {apiBalanceInfo.balance_infos.map((info, idx) => {
+                        const low = balanceLooksLow(info);
+                        return (
+                          <div key={`${info.currency}-${idx}`} style={{ background: C.bgInset, border: `1px solid ${low ? C.rose : C.border}`, borderRadius: 8, padding: "10px 12px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                              <span style={{ fontSize: 12, color: C.textDim }} className="mono">{info.currency}</span>
+                              <span style={{ fontSize: 12, color: low || apiBalanceInfo.is_available === false ? C.rose : C.accent, fontWeight: 600 }}>
+                                {apiBalanceInfo.is_available === false ? "Balance too low" : low ? "Running low" : "Balance looks fine"}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 14, color: C.text, marginBottom: 4 }} className="serif-body">Available balance: {info.total_balance} {info.currency}</div>
+                            <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.6 }} className="mono">Granted: {info.granted_balance} · Topped up: {info.topped_up_balance}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
