@@ -304,6 +304,7 @@ export default function BiblionApp() {
   const [readerChapterIdx, setReaderChapterIdx] = useState(0);
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState("");
+  const backPressRef = useRef({ last: 0 });
 
   // ── Load from localStorage + handle OAuth redirect ──
   useEffect(() => {
@@ -332,6 +333,71 @@ export default function BiblionApp() {
   }, []);
 
   const persist = (key, val) => store.set(key, val);
+
+  useEffect(() => {
+    const canStepBack = () => !!readerBook || !!selectedBook || showSearch || showMyLibrary || showAddMenu || selectedShelf !== null || tab !== "books";
+
+    const stepBack = () => {
+      if (readerBook) {
+        setReaderBook(null);
+        return true;
+      }
+      if (selectedBook) {
+        setSelectedBook(null);
+        setInsight(null);
+        cancelEditing();
+        return true;
+      }
+      if (showSearch) {
+        setShowSearch(false);
+        setSearchResults([]);
+        setSearchQuery("");
+        return true;
+      }
+      if (showMyLibrary) {
+        setShowMyLibrary(false);
+        setSelectedShelf(null);
+        setShelfVolumes([]);
+        setVolumesError(null);
+        return true;
+      }
+      if (showAddMenu) {
+        setShowAddMenu(false);
+        return true;
+      }
+      if (selectedShelf !== null) {
+        setSelectedShelf(null);
+        setShelfVolumes([]);
+        setVolumesError(null);
+        return true;
+      }
+      if (tab !== "books") {
+        setTab("books");
+        return true;
+      }
+      return false;
+    };
+
+    const onPopState = () => {
+      if (stepBack()) {
+        window.history.pushState({ biblion: true }, "");
+        return;
+      }
+      const now = Date.now();
+      if (now - backPressRef.current.last < 1200) {
+        window.removeEventListener("popstate", onPopState);
+        window.history.back();
+        return;
+      }
+      backPressRef.current.last = now;
+      window.history.pushState({ biblion: true }, "");
+    };
+
+    window.history.replaceState({ biblion: true }, "");
+    window.history.pushState({ biblion: true }, "");
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [readerBook, selectedBook, showSearch, showMyLibrary, showAddMenu, selectedShelf, tab]);
 
   const handleBookUpload = async (e) => {
     const file = e.target.files?.[0]; if (!file) return;
@@ -732,9 +798,8 @@ export default function BiblionApp() {
           <div className="fade-up" style={{ paddingTop: 14, marginBottom: 12 }}>
             <div className="card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ fontSize: 15, fontWeight: 600, fontStyle: "italic" }}>Add a book</div>
-              <button className="btn-primary" onClick={() => { setShowAddMenu(false); setShowSearch(true); }}>Use Google Books</button>
               <button className="btn-ghost" onClick={() => { setShowAddMenu(false); fileInputRef.current?.click(); }}>Upload EPUB or PDF</button>
-              {googleAccessToken && <button className="btn-ghost" onClick={() => { setShowAddMenu(false); setShowMyLibrary(true); }}>My Google Library</button>}
+              {googleAccessToken && <button className="btn-primary" onClick={() => { setShowAddMenu(false); setShowMyLibrary(true); }}>My Google Library</button>}
             </div>
           </div>
         )}
