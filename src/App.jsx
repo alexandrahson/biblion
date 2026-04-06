@@ -127,8 +127,15 @@ export default function BiblionApp() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState("");
+  const [googleAccessToken, setGoogleAccessToken] = useState("");
+  const [googleShelves, setGoogleShelves] = useState([]);
+  const [loadingShelves, setLoadingShelves] = useState(false);
+  const [selectedShelf, setSelectedShelf] = useState(null);
+  const [shelfVolumes, setShelfVolumes] = useState([]);
+  const [showMyLibrary, setShowMyLibrary] = useState(false);
 
-  // ── Load from localStorage ──
+  // ── Load from localStorage + handle OAuth redirect ──
   useEffect(() => {
     const b = store.get("biblion-books"); if (b) setBooks(b);
     const d = store.get("biblion-dict"); if (d) setDictionary(d);
@@ -136,6 +143,21 @@ export default function BiblionApp() {
     const cw = store.get("biblion-current-word"); if (cw) setCurrentWord(cw);
     const lt = store.get("biblion-last-word-time"); if (lt) setLastWordTime(lt);
     const k = store.get("biblion-api-key"); if (k) setApiKey(k);
+    const gc = store.get("biblion-google-client-id"); if (gc) setGoogleClientId(gc);
+    // Handle Google OAuth redirect (implicit flow — token in URL hash)
+    const hash = window.location.hash;
+    if (hash.includes("access_token=")) {
+      const params = new URLSearchParams(hash.slice(1));
+      const token = params.get("access_token");
+      if (token) {
+        setGoogleAccessToken(token);
+        store.set("biblion-google-token", token);
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    } else {
+      const savedToken = store.get("biblion-google-token");
+      if (savedToken) setGoogleAccessToken(savedToken);
+    }
   }, []);
 
   const persist = (key, val) => store.set(key, val);
@@ -227,6 +249,44 @@ export default function BiblionApp() {
       alert("Search failed: " + err.message);
     }
     setSearching(false);
+  };
+
+  const connectGoogleBooks = () => {
+    if (!googleClientId.trim()) return;
+    const redirectUri = window.location.origin + window.location.pathname;
+    const scope = "https://www.googleapis.com/auth/books";
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(googleClientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}`;
+    window.location.href = url;
+  };
+
+  const disconnectGoogleBooks = () => {
+    setGoogleAccessToken(""); setGoogleShelves([]); setSelectedShelf(null); setShelfVolumes([]);
+    store.del("biblion-google-token");
+  };
+
+  const fetchGoogleShelves = async (token) => {
+    setLoadingShelves(true); setGoogleShelves([]);
+    try {
+      const res = await fetch("https://www.googleapis.com/books/v1/mylibrary/bookshelves", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401) { disconnectGoogleBooks(); return; }
+      const data = await res.json();
+      setGoogleShelves((data.items || []).filter(s => s.volumeCount > 0));
+    } catch (err) { alert("Could not load shelves: " + err.message); }
+    setLoadingShelves(false);
+  };
+
+  const fetchShelfVolumes = async (shelfId) => {
+    setSelectedShelf(shelfId); setShelfVolumes([]);
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/books/v1/mylibrary/bookshelves/${shelfId}/volumes?maxResults=40`,
+        { headers: { Authorization: `Bearer ${googleAccessToken}` } }
+      );
+      const data = await res.json();
+      setShelfVolumes(data.items || []);
+    } catch (err) { alert("Could not load shelf: " + err.message); }
   };
 
   const addFromGoogleBooks = (item) => {
@@ -321,8 +381,13 @@ export default function BiblionApp() {
           </div>
         </div>
         {tab === "books" && (
-          <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
-            <button onClick={() => { setShowSearch(s => !s); setSearchResults([]); setSearchQuery(""); }} style={{ width: 38, height: 38, borderRadius: 10, background: showSearch ? C.bgSurface : "transparent", color: showSearch ? C.accent : C.textMid, border: `1px solid ${showSearch ? C.accent : C.border}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 4, alignItems: "center" }}>
+            {googleAccessToken && (
+              <button onClick={() => { setShowMyLibrary(s => !s); setShowSearch(false); setSelectedShelf(null); setShelfVolumes([]); }} style={{ height: 38, borderRadius: 10, background: showMyLibrary ? C.bgSurface : "transparent", color: showMyLibrary ? C.gold : C.textMid, border: `1px solid ${showMyLibrary ? C.gold : C.border}`, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, padding: "0 12px", fontSize: 12, fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, transition: "all 0.2s", whiteSpace: "nowrap" }}>
+                {showMyLibrary ? <IconClose /> : <span style={{ fontSize: 14 }}>G</span>} {showMyLibrary ? "" : "My Library"}
+              </button>
+            )}
+            <button onClick={() => { setShowSearch(s => !s); setShowMyLibrary(false); setSearchResults([]); setSearchQuery(""); }} style={{ width: 38, height: 38, borderRadius: 10, background: showSearch ? C.bgSurface : "transparent", color: showSearch ? C.accent : C.textMid, border: `1px solid ${showSearch ? C.accent : C.border}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>
               {showSearch ? <IconClose /> : <IconSearch />}
             </button>
             <button onClick={() => fileInputRef.current?.click()} style={{ width: 38, height: 38, borderRadius: 10, background: `linear-gradient(135deg, ${C.rose}, #A86E73)`, color: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 10px rgba(196,134,139,0.25)" }}>
@@ -384,6 +449,63 @@ export default function BiblionApp() {
                   );
                 })}
               </div>
+            )}
+            <div style={{ height: 1, background: C.border, margin: "14px 0 0" }} />
+          </div>
+        )}
+
+        {/* MY GOOGLE LIBRARY PANEL */}
+        {tab === "books" && !selectedBook && googleAccessToken && showMyLibrary && (
+          <div className="fade-up" style={{ paddingTop: 14, marginBottom: 4 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, fontStyle: "italic" }}>My Google Library</div>
+              <button className="btn-ghost" onClick={() => { setShowMyLibrary(false); setSelectedShelf(null); setShelfVolumes([]); }} style={{ fontSize: 12, padding: "5px 10px" }}>Close</button>
+            </div>
+            {googleShelves.length === 0 && !loadingShelves && (
+              <button className="btn-primary" onClick={() => fetchGoogleShelves(googleAccessToken)} style={{ marginBottom: 12 }}>Load My Shelves</button>
+            )}
+            {loadingShelves && <Spinner />}
+            {googleShelves.length > 0 && !selectedShelf && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {googleShelves.map(shelf => (
+                  <div key={shelf.id} className="card" style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }} onClick={() => fetchShelfVolumes(shelf.id)}>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 600 }}>{shelf.title}</div>
+                      <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }} className="mono">{shelf.volumeCount} book{shelf.volumeCount !== 1 ? "s" : ""}</div>
+                    </div>
+                    <span style={{ color: C.textDim, fontSize: 18 }}>›</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {selectedShelf !== null && (
+              <>
+                <button className="btn-ghost" onClick={() => { setSelectedShelf(null); setShelfVolumes([]); }} style={{ marginBottom: 12, fontSize: 12 }}>‹ Shelves</button>
+                {shelfVolumes.length === 0 && <div style={{ textAlign: "center", padding: 24, color: C.textDim, fontSize: 14, fontStyle: "italic" }}>Loading…</div>}
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {shelfVolumes.map(item => {
+                    const info = item.volumeInfo;
+                    const cover = info.imageLinks?.thumbnail?.replace("http://", "https://");
+                    const alreadyAdded = books.some(b => b.title === info.title && b.author === info.authors?.join(", "));
+                    return (
+                      <div key={item.id} className="card" style={{ display: "flex", gap: 12, alignItems: "stretch" }}>
+                        {cover ? (
+                          <img src={cover} alt="" style={{ width: 44, height: 62, objectFit: "cover", borderRadius: 4, flexShrink: 0, opacity: 0.9 }} />
+                        ) : (
+                          <div style={{ width: 44, height: 62, background: C.bgSurface, borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><IconBook /></div>
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, marginBottom: 2 }}>{info.title}</div>
+                          {info.authors && <div style={{ fontSize: 12, color: C.textMid }}>{info.authors.join(", ")}</div>}
+                        </div>
+                        <button onClick={() => addFromGoogleBooks(item)} disabled={alreadyAdded} style={{ alignSelf: "center", flexShrink: 0, background: alreadyAdded ? "transparent" : `linear-gradient(135deg, ${C.accent}, #4D8A8C)`, color: alreadyAdded ? C.textDim : "#fff", border: alreadyAdded ? `1px solid ${C.border}` : "none", borderRadius: 8, padding: "7px 12px", cursor: alreadyAdded ? "default" : "pointer", fontSize: 12, fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, whiteSpace: "nowrap" }}>
+                          {alreadyAdded ? "Shelved" : "+ Shelve"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
             <div style={{ height: 1, background: C.border, margin: "14px 0 0" }} />
           </div>
@@ -558,6 +680,40 @@ export default function BiblionApp() {
                 <button className="btn-ghost" onClick={() => setShowKeyInput(true)} style={{ fontSize: 13 }}>
                   Change Key
                 </button>
+              )}
+            </div>
+
+            <div className="card" style={{ marginBottom: 12, borderColor: googleAccessToken ? "rgba(95,158,160,0.3)" : C.border }}>
+              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, fontStyle: "italic" }}>
+                Google Books {googleAccessToken ? <span style={{ color: C.accent, fontSize: 12 }}>✓ Connected</span> : <span style={{ color: C.textDim, fontSize: 12 }}>Not connected</span>}
+              </div>
+              {googleAccessToken ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ fontSize: 14, color: C.textMid, lineHeight: 1.7 }} className="serif-body">Your Google Books account is connected. Browse your shelves from the Books tab.</div>
+                  <button className="btn-ghost" onClick={disconnectGoogleBooks} style={{ fontSize: 13, color: "#C46B6B" }}>Disconnect</button>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ fontSize: 14, color: C.textMid, lineHeight: 1.7, marginBottom: 4 }} className="serif-body">
+                    Connect your Google Books account to browse your shelves and import books. You'll need a Google OAuth Client ID — create one free at <span style={{ color: C.accent, fontFamily: "monospace", fontSize: 12 }}>console.cloud.google.com</span>.
+                  </div>
+                  <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.6, marginBottom: 4 }} className="mono">
+                    1. Create a project → Enable "Books API"<br/>
+                    2. Credentials → OAuth 2.0 Client ID (Web)<br/>
+                    3. Add <span style={{ color: C.accent }}>https://biblion-bvzl.vercel.app</span> as authorized redirect URI
+                  </div>
+                  <input
+                    className="api-input"
+                    type="text"
+                    placeholder="your-client-id.apps.googleusercontent.com"
+                    value={googleClientId}
+                    onChange={e => setGoogleClientId(e.target.value)}
+                  />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="btn-ghost" onClick={() => { persist("biblion-google-client-id", googleClientId); }} disabled={!googleClientId} style={{ fontSize: 13, flex: 1 }}>Save ID</button>
+                    <button className="btn-primary" onClick={() => { persist("biblion-google-client-id", googleClientId); connectGoogleBooks(); }} disabled={!googleClientId} style={{ fontSize: 13, flex: 2 }}>Connect with Google</button>
+                  </div>
+                </div>
               )}
             </div>
 
