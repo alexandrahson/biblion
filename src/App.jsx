@@ -270,9 +270,9 @@ export default function BiblionApp() {
       const res = await fetch("https://www.googleapis.com/books/v1/mylibrary/bookshelves", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.status === 401) { disconnectGoogleBooks(); return; }
+      if (res.status === 401) { disconnectGoogleBooks(); alert("Session expired — please reconnect in Settings."); return; }
       const data = await res.json();
-      setGoogleShelves((data.items || []).filter(s => s.volumeCount > 0));
+      setGoogleShelves(data.items || []);
     } catch (err) { alert("Could not load shelves: " + err.message); }
     setLoadingShelves(false);
   };
@@ -461,7 +461,7 @@ export default function BiblionApp() {
               <div style={{ fontSize: 15, fontWeight: 600, fontStyle: "italic" }}>My Google Library</div>
               <button className="btn-ghost" onClick={() => { setShowMyLibrary(false); setSelectedShelf(null); setShelfVolumes([]); }} style={{ fontSize: 12, padding: "5px 10px" }}>Close</button>
             </div>
-            {googleShelves.length === 0 && !loadingShelves && (
+            {googleShelves.length === 0 && !loadingShelves && !selectedShelf && (
               <button className="btn-primary" onClick={() => fetchGoogleShelves(googleAccessToken)} style={{ marginBottom: 12 }}>Load My Shelves</button>
             )}
             {loadingShelves && <Spinner />}
