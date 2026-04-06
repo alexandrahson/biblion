@@ -299,6 +299,7 @@ export default function BiblionApp() {
   const [volumesError, setVolumesError] = useState(null);
   const [addingBookId, setAddingBookId] = useState(null);
   const [showMyLibrary, setShowMyLibrary] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
   const [readerBook, setReaderBook] = useState(null);
   const [readerChapterIdx, setReaderChapterIdx] = useState(0);
   const [editingField, setEditingField] = useState(null);
@@ -374,12 +375,18 @@ export default function BiblionApp() {
     if (!ensureApiKey()) return;
     setLoading(true); setInsight(null);
     try {
-      const chapters = getChapterChunks(getChapters(book));
-      const chapterSample = chapters.find(ch => ch.chunks.length)?.chunks.slice(0, 2).map(c => c.content).join("\n\n") || book.textContent.slice(0, 12000);
-      const sys = `You are Biblion, a literary curator in a dusty, candlelit bookshop. Choose one passage from the supplied text and present it in 5 sentences or fewer. Respond ONLY in JSON: {"title":"","body":"","page_hint":"","reflection":""}`;
-      const usr = `Give me a memorable passage from the current chapter material in 5 sentences or fewer. Use the book's own language where possible, lightly trimmed only for brevity.\n\nBook: "${book.title}"\nText:\n${chapterSample}`;
+      const rawChapters = getChapters(book);
+      const currentChapterIdx = book.id === readerBook?.id ? readerChapterIdx : (store.get(`biblion-reader-${book.id}`)?.chapterIdx || 0);
+      const chapter = rawChapters[currentChapterIdx] || rawChapters[0];
+      const chapterText = chapter?.content || book.textContent.slice(0, 12000);
+      const chapterChunks = splitIntoSentenceChunks(chapterText, 3, 5);
+      const recentBodies = (store.get(`biblion-passage-history-${book.id}-${currentChapterIdx}`) || []).slice(0, 8);
+      const sys = `You are Biblion, a literary curator in a dusty, candlelit bookshop. Choose one passage from the supplied chapter text and present it in 5 sentences or fewer. Do not repeat any prior passage if a distinct option exists. Respond ONLY in JSON: {"title":"","body":"","page_hint":"","reflection":""}`;
+      const usr = `Give me one memorable passage from this exact chapter in 5 sentences or fewer. The reader is currently on chapter: "${chapter?.title || `Chapter ${currentChapterIdx + 1}`}". Prefer a chunk that has not been used recently.\n\nRecent passages to avoid:\n${recentBodies.join("\n---\n") || "None"}\n\nCandidate chunks:\n${chapterChunks.map((chunk, i) => `[Chunk ${i + 1}] ${chunk}`).join("\n\n") || chapterText}`;
       const raw = await askAI(sys, usr, apiKey);
-      setInsight(JSON.parse(raw.replace(/```json|```/g, "").trim()));
+      const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
+      setInsight(parsed);
+      persist(`biblion-passage-history-${book.id}-${currentChapterIdx}`, [parsed.body, ...recentBodies].slice(0, 12));
       const u = books.map(b => b.id === book.id ? { ...b, insightCount: b.insightCount + 1 } : b);
       setBooks(u); persist("biblion-books", u);
     } catch (err) { setInsight({ title: "Error", body: err.message, page_hint: "", reflection: "" }); }
@@ -650,7 +657,7 @@ export default function BiblionApp() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "'Cormorant Garamond', 'Georgia', serif", maxWidth: 480, margin: "0 auto", position: "relative", paddingBottom: 84 }}>
+    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "'Cormorant Garamond', 'Georgia', serif", maxWidth: 430, width: "100%", aspectRatio: "9 / 16", margin: "0 auto", position: "relative", paddingBottom: 84, overflowX: "hidden" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -701,21 +708,16 @@ export default function BiblionApp() {
         <div>
           <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: "3px", color: C.text, textTransform: "uppercase", fontFamily: "'Libre Baskerville', serif" }}>Biblion</div>
           <div style={{ fontSize: 12, color: C.textDim, fontWeight: 400, marginTop: 2, letterSpacing: "3px", textTransform: "uppercase", fontFamily: "'Libre Baskerville', serif" }}>
-            {tab === "books" ? "The Stacks" : tab === "vocab" ? "Word Alcove" : "Bookshop Notes"}
+            {tab === "books" ? "The Stacks" : tab === "vocab" ? "Word Alcove" : "Settings"}
           </div>
         </div>
         {tab === "books" && (
           <div style={{ display: "flex", gap: 8, marginBottom: 4, alignItems: "center" }}>
-            {googleAccessToken && (
-              <button onClick={() => { setShowMyLibrary(s => !s); setShowSearch(false); setSelectedShelf(null); setShelfVolumes([]); }} style={{ height: 38, borderRadius: 10, background: showMyLibrary ? C.bgSurface : "transparent", color: showMyLibrary ? C.gold : C.textMid, border: `1px solid ${showMyLibrary ? C.gold : C.border}`, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, padding: "0 12px", fontSize: 12, fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, transition: "all 0.2s", whiteSpace: "nowrap" }}>
-                {showMyLibrary ? <IconClose /> : <span style={{ fontSize: 14 }}>G</span>} {showMyLibrary ? "" : "My Library"}
-              </button>
-            )}
-            <button onClick={() => { setShowSearch(s => !s); setShowMyLibrary(false); setSearchResults([]); setSearchQuery(""); }} style={{ width: 38, height: 38, borderRadius: 10, background: showSearch ? C.bgSurface : "transparent", color: showSearch ? C.accent : C.textMid, border: `1px solid ${showSearch ? C.accent : C.border}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>
+            <button onClick={() => { setShowSearch(s => !s); setShowAddMenu(false); setShowMyLibrary(false); setSearchResults([]); setSearchQuery(""); }} style={{ width: 38, height: 38, borderRadius: 10, background: showSearch ? C.bgSurface : "transparent", color: showSearch ? C.accent : C.textMid, border: `1px solid ${showSearch ? C.accent : C.border}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>
               {showSearch ? <IconClose /> : <IconSearch />}
             </button>
-            <button onClick={() => fileInputRef.current?.click()} style={{ width: 38, height: 38, borderRadius: 10, background: `linear-gradient(135deg, ${C.rose}, #A86E73)`, color: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 10px rgba(196,134,139,0.25)" }}>
-              <IconPlus />
+            <button onClick={() => { setShowAddMenu(s => !s); setShowSearch(false); setShowMyLibrary(false); setSelectedShelf(null); setShelfVolumes([]); }} style={{ width: 38, height: 38, borderRadius: 10, background: showAddMenu ? C.bgSurface : `linear-gradient(135deg, ${C.rose}, #A86E73)`, color: showAddMenu ? C.rose : "#fff", border: showAddMenu ? `1px solid ${C.rose}` : "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: showAddMenu ? "none" : "0 2px 10px rgba(196,134,139,0.25)" }}>
+              {showAddMenu ? <IconClose /> : <IconPlus />}
             </button>
           </div>
         )}
@@ -725,6 +727,17 @@ export default function BiblionApp() {
       <input ref={dictInputRef} type="file" accept=".txt,.csv,.tsv" onChange={handleDictUpload} />
 
       <div style={{ padding: "0 22px", position: "relative", zIndex: 1 }}>
+
+        {tab === "books" && !selectedBook && showAddMenu && (
+          <div className="fade-up" style={{ paddingTop: 14, marginBottom: 12 }}>
+            <div className="card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, fontStyle: "italic" }}>Add a book</div>
+              <button className="btn-primary" onClick={() => { setShowAddMenu(false); setShowSearch(true); }}>Use Google Books</button>
+              <button className="btn-ghost" onClick={() => { setShowAddMenu(false); fileInputRef.current?.click(); }}>Upload EPUB or PDF</button>
+              {googleAccessToken && <button className="btn-ghost" onClick={() => { setShowAddMenu(false); setShowMyLibrary(true); }}>My Google Library</button>}
+            </div>
+          </div>
+        )}
 
         {/* GOOGLE BOOKS SEARCH PANEL */}
         {tab === "books" && !selectedBook && showSearch && (
@@ -895,7 +908,10 @@ export default function BiblionApp() {
                     <button className="btn-ghost" onClick={cancelEditing} style={{ padding: "4px 10px", fontSize: 12, flexShrink: 0 }}>✕</button>
                   </div>
                 ) : (
-                  <div onClick={() => startEditing("title", selectedBook.title)} style={{ fontSize: 22, fontWeight: 600, lineHeight: 1.2, cursor: "pointer", borderBottom: `1px dashed ${C.border}`, paddingBottom: 2 }} title="Click to edit title">{selectedBook.title}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ fontSize: 22, fontWeight: 600, lineHeight: 1.2, paddingBottom: 2, flex: 1 }}>{selectedBook.title}</div>
+                    <button className="btn-ghost" onClick={() => startEditing("title", selectedBook.title)} style={{ padding: "4px 10px", fontSize: 12, flexShrink: 0 }}>Edit</button>
+                  </div>
                 )}
                 {selectedBook.author && <div style={{ fontSize: 13, color: C.textMid, marginTop: 4, fontStyle: "italic" }}>{selectedBook.author}</div>}
               </div>
@@ -916,7 +932,10 @@ export default function BiblionApp() {
                 </div>
               </div>
             ) : (
-              <div onClick={() => startEditing("textPreview", selectedBook.textPreview)} style={{ fontSize: 13, color: C.textMid, marginBottom: 22, lineHeight: 1.6, cursor: "pointer", borderBottom: `1px dashed ${C.border}`, paddingBottom: 4 }} className="serif-body" title="Click to edit description">{selectedBook.textPreview}</div>
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ fontSize: 13, color: C.textMid, marginBottom: 8, lineHeight: 1.6, paddingBottom: 4 }} className="serif-body">{selectedBook.textPreview}</div>
+                <button className="btn-ghost" onClick={() => startEditing("textPreview", selectedBook.textPreview)} style={{ padding: "4px 10px", fontSize: 12 }}>Edit</button>
+              </div>
             )}
             <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
               <button className="btn-primary" onClick={() => generatePassage(selectedBook)} disabled={loading} style={{ flex: 1, width: "auto" }}>{loading ? "Finding a passage…" : "Passage"}</button>
@@ -1157,7 +1176,7 @@ export default function BiblionApp() {
 
       {/* Tab Bar */}
       <div className="tab-bar">
-        {[["books","The Stacks",<IconBook key="b"/>],["vocab","Word Alcove",<IconVocab key="v"/>],["settings","Notes",<IconSettings key="s"/>]].map(([id,label,icon]) => (
+        {[["books","The Stacks",<IconBook key="b"/>],["vocab","Word Alcove",<IconVocab key="v"/>],["settings","Settings",<IconSettings key="s"/>]].map(([id,label,icon]) => (
           <button key={id} className={`tab-item ${tab === id ? "active" : ""}`} onClick={() => { setTab(id); setSelectedBook(null); setInsight(null); }}>
             {icon}<span>{label}</span>
             {id === "vocab" && wordReady && dictionary.length > 0 && (
