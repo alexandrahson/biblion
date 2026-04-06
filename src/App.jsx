@@ -90,6 +90,8 @@ const IconBook = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="no
 const IconVocab = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>);
 const IconSettings = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>);
 const IconPlus = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>);
+const IconSearch = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>);
+const IconClose = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>);
 
 const Spinner = () => (
   <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
@@ -121,6 +123,10 @@ export default function BiblionApp() {
   const [showKeyInput, setShowKeyInput] = useState(false);
   const fileInputRef = useRef(null);
   const dictInputRef = useRef(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
 
   // ── Load from localStorage ──
   useEffect(() => {
@@ -209,6 +215,50 @@ export default function BiblionApp() {
 
   const deleteBook = async (id) => { const u = books.filter(b => b.id !== id); setBooks(u); persist("biblion-books", u); if (selectedBook?.id === id) setSelectedBook(null); };
 
+  const searchGoogleBooks = async (query) => {
+    if (!query.trim()) return;
+    setSearching(true);
+    setSearchResults([]);
+    try {
+      const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=12&printType=books`);
+      const data = await res.json();
+      setSearchResults(data.items || []);
+    } catch (err) {
+      alert("Search failed: " + err.message);
+    }
+    setSearching(false);
+  };
+
+  const addFromGoogleBooks = (item) => {
+    const info = item.volumeInfo;
+    const parts = [
+      `Title: ${info.title || "Unknown"}`,
+      info.authors ? `Author(s): ${info.authors.join(", ")}` : "",
+      info.publishedDate ? `Published: ${info.publishedDate}` : "",
+      info.categories ? `Categories: ${info.categories.join(", ")}` : "",
+      info.description ? `\nDescription:\n${info.description}` : "",
+    ].filter(Boolean);
+    const textContent = parts.join("\n");
+    const nb = {
+      id: Date.now().toString(),
+      title: info.title || "Unknown Title",
+      author: info.authors?.join(", ") || "",
+      fileName: "",
+      textPreview: info.description?.slice(0, 500) || "No description available.",
+      textContent,
+      addedAt: new Date().toISOString(),
+      insightCount: 0,
+      coverUrl: info.imageLinks?.thumbnail?.replace("http://", "https://") || null,
+      source: "google-books",
+    };
+    const u = [...books, nb];
+    setBooks(u);
+    persist("biblion-books", u);
+    setShowSearch(false);
+    setSearchQuery("");
+    setSearchResults([]);
+  };
+
   const spineColor = (title) => {
     const colors = [C.rose, C.accent, C.gold, "#8B6B5A", "#7A6858", "#6B8A8C", "#A07868"];
     let h = 0; for (let i = 0; i < title.length; i++) h = title.charCodeAt(i) + ((h << 5) - h);
@@ -257,6 +307,9 @@ export default function BiblionApp() {
         .api-input { width: 100%; padding: 12px 14px; background: ${C.bgInset}; border: 1px solid ${C.border}; border-radius: 8px; color: ${C.text}; font-family: 'JetBrains Mono', monospace; font-size: 13px; outline: none; }
         .api-input:focus { border-color: ${C.accent}; }
         .api-input::placeholder { color: ${C.textDim}; }
+        .search-input { width: 100%; padding: 11px 14px; background: ${C.bgInset}; border: 1px solid ${C.border}; border-radius: 8px; color: ${C.text}; font-family: 'Cormorant Garamond', serif; font-size: 15px; outline: none; }
+        .search-input:focus { border-color: ${C.accent}; }
+        .search-input::placeholder { color: ${C.textDim}; }
       `}</style>
 
       {/* Header */}
@@ -268,9 +321,14 @@ export default function BiblionApp() {
           </div>
         </div>
         {tab === "books" && (
-          <button onClick={() => fileInputRef.current?.click()} style={{ width: 38, height: 38, borderRadius: 10, background: `linear-gradient(135deg, ${C.rose}, #A86E73)`, color: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 10px rgba(196,134,139,0.25)", marginBottom: 4 }}>
-            <IconPlus />
-          </button>
+          <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+            <button onClick={() => { setShowSearch(s => !s); setSearchResults([]); setSearchQuery(""); }} style={{ width: 38, height: 38, borderRadius: 10, background: showSearch ? C.bgSurface : "transparent", color: showSearch ? C.accent : C.textMid, border: `1px solid ${showSearch ? C.accent : C.border}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>
+              {showSearch ? <IconClose /> : <IconSearch />}
+            </button>
+            <button onClick={() => fileInputRef.current?.click()} style={{ width: 38, height: 38, borderRadius: 10, background: `linear-gradient(135deg, ${C.rose}, #A86E73)`, color: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 10px rgba(196,134,139,0.25)" }}>
+              <IconPlus />
+            </button>
+          </div>
         )}
       </div>
 
@@ -278,6 +336,58 @@ export default function BiblionApp() {
       <input ref={dictInputRef} type="file" accept=".txt,.csv,.tsv" onChange={handleDictUpload} />
 
       <div style={{ padding: "0 22px", position: "relative", zIndex: 1 }}>
+
+        {/* GOOGLE BOOKS SEARCH PANEL */}
+        {tab === "books" && !selectedBook && showSearch && (
+          <div className="fade-up" style={{ paddingTop: 14, marginBottom: 4 }}>
+            <form onSubmit={e => { e.preventDefault(); searchGoogleBooks(searchQuery); }} style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+              <input
+                className="search-input"
+                type="text"
+                placeholder="Search by title or author…"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                autoFocus
+              />
+              <button type="submit" className="btn-primary" disabled={searching || !searchQuery.trim()} style={{ width: "auto", padding: "0 18px", flexShrink: 0, fontSize: 14 }}>
+                {searching ? "…" : "Search"}
+              </button>
+            </form>
+            {searching && <Spinner />}
+            {!searching && searchResults.length === 0 && searchQuery && (
+              <div style={{ textAlign: "center", padding: "24px 0", color: C.textDim, fontSize: 14, fontStyle: "italic" }}>No results found</div>
+            )}
+            {searchResults.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingBottom: 8 }}>
+                {searchResults.map(item => {
+                  const info = item.volumeInfo;
+                  const cover = info.imageLinks?.thumbnail?.replace("http://", "https://");
+                  const alreadyAdded = books.some(b => b.title === info.title && b.author === info.authors?.join(", "));
+                  return (
+                    <div key={item.id} className="card" style={{ display: "flex", gap: 12, alignItems: "stretch" }}>
+                      {cover ? (
+                        <img src={cover} alt="" style={{ width: 46, height: 66, objectFit: "cover", borderRadius: 4, flexShrink: 0, opacity: 0.9 }} />
+                      ) : (
+                        <div style={{ width: 46, height: 66, background: C.bgSurface, borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <IconBook />
+                        </div>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, marginBottom: 2 }}>{info.title}</div>
+                        {info.authors && <div style={{ fontSize: 12, color: C.textMid, marginBottom: 4 }}>{info.authors.join(", ")}</div>}
+                        {info.description && <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }} className="serif-body">{info.description}</div>}
+                      </div>
+                      <button onClick={() => addFromGoogleBooks(item)} disabled={alreadyAdded} style={{ alignSelf: "center", flexShrink: 0, background: alreadyAdded ? "transparent" : `linear-gradient(135deg, ${C.accent}, #4D8A8C)`, color: alreadyAdded ? C.textDim : "#fff", border: alreadyAdded ? `1px solid ${C.border}` : "none", borderRadius: 8, padding: "7px 12px", cursor: alreadyAdded ? "default" : "pointer", fontSize: 12, fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, whiteSpace: "nowrap" }}>
+                        {alreadyAdded ? "Shelved" : "+ Shelve"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div style={{ height: 1, background: C.border, margin: "14px 0 0" }} />
+          </div>
+        )}
 
         {/* BOOKS — Empty */}
         {tab === "books" && !selectedBook && (
@@ -292,15 +402,20 @@ export default function BiblionApp() {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 14 }}>
                 {books.map(book => (
-                  <div key={book.id} className="card" onClick={() => setSelectedBook(book)} style={{ cursor: "pointer", display: "flex", gap: 14, alignItems: "stretch" }}>
-                    <div className="book-spine" style={{ background: spineColor(book.title), minHeight: 50 }} />
+                  <div key={book.id} className="card" onClick={() => setSelectedBook(book)} style={{ cursor: "pointer", display: "flex", gap: 12, alignItems: "stretch" }}>
+                    {book.coverUrl ? (
+                      <img src={book.coverUrl} alt="" style={{ width: 44, height: 62, objectFit: "cover", borderRadius: 4, flexShrink: 0, opacity: 0.9 }} />
+                    ) : (
+                      <div className="book-spine" style={{ background: spineColor(book.title), minHeight: 50 }} />
+                    )}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                        <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 3, lineHeight: 1.3 }}>{book.title}</div>
+                        <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 2, lineHeight: 1.3 }}>{book.title}</div>
                         <button onClick={e => { e.stopPropagation(); deleteBook(book.id); }} style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 16, padding: "0 2px", flexShrink: 0 }}>×</button>
                       </div>
+                      {book.author && <div style={{ fontSize: 12, color: C.textMid, marginBottom: 2 }}>{book.author}</div>}
                       <div style={{ fontSize: 11, color: C.textDim }} className="mono">{book.insightCount} insight{book.insightCount !== 1 ? "s" : ""} drawn</div>
-                      <div style={{ fontSize: 13, color: C.textMid, marginTop: 8, lineHeight: 1.6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }} className="serif-body">{book.textPreview}</div>
+                      <div style={{ fontSize: 13, color: C.textMid, marginTop: 6, lineHeight: 1.6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }} className="serif-body">{book.textPreview}</div>
                     </div>
                   </div>
                 ))}
@@ -313,11 +428,18 @@ export default function BiblionApp() {
         {tab === "books" && selectedBook && (
           <div className="fade-up" style={{ paddingTop: 8 }}>
             <button className="btn-ghost" onClick={() => { setSelectedBook(null); setInsight(null); }} style={{ marginBottom: 18 }}>‹ Back to the Stacks</button>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
-              <div className="book-spine" style={{ background: spineColor(selectedBook.title), height: 36 }} />
-              <div style={{ fontSize: 22, fontWeight: 600, lineHeight: 1.2 }}>{selectedBook.title}</div>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 4 }}>
+              {selectedBook.coverUrl ? (
+                <img src={selectedBook.coverUrl} alt="" style={{ width: 54, height: 76, objectFit: "cover", borderRadius: 5, flexShrink: 0, opacity: 0.92 }} />
+              ) : (
+                <div className="book-spine" style={{ background: spineColor(selectedBook.title), height: 36, alignSelf: "center" }} />
+              )}
+              <div>
+                <div style={{ fontSize: 22, fontWeight: 600, lineHeight: 1.2 }}>{selectedBook.title}</div>
+                {selectedBook.author && <div style={{ fontSize: 13, color: C.textMid, marginTop: 4, fontStyle: "italic" }}>{selectedBook.author}</div>}
+              </div>
             </div>
-            <div style={{ fontSize: 11, color: C.textDim, marginBottom: 22, paddingLeft: 18 }} className="mono">{selectedBook.insightCount} insights · {Math.round(selectedBook.textContent.length / 1000)}k chars</div>
+            <div style={{ fontSize: 11, color: C.textDim, marginBottom: 22, paddingLeft: selectedBook.coverUrl ? 68 : 18 }} className="mono">{selectedBook.insightCount} insights · {Math.round(selectedBook.textContent.length / 1000)}k chars</div>
             <div style={{ fontSize: 14, color: C.textMid, marginBottom: 10, fontStyle: "italic" }}>What would you like to discover?</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
               {[["key_idea","Key Idea"],["quote","Passage"],["practical","Practical"],["surprise","Surprise"],["connection","Connection"]].map(([v,l]) => (
