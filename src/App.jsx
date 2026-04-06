@@ -755,7 +755,6 @@ export default function BiblionApp() {
                         <button onClick={e => { e.stopPropagation(); deleteBook(book.id); }} style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 16, padding: "0 2px", flexShrink: 0 }}>×</button>
                       </div>
                       {book.author && <div style={{ fontSize: 12, color: C.textMid, marginBottom: 2 }}>{book.author}</div>}
-                      <div style={{ fontSize: 11, color: C.textDim }} className="mono">{book.insightCount} insight{book.insightCount !== 1 ? "s" : ""} drawn</div>
                       <div style={{ fontSize: 13, color: C.textMid, marginTop: 6, lineHeight: 1.6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }} className="serif-body">{book.textPreview}</div>
                     </div>
                   </div>
