@@ -337,38 +337,24 @@ export default function BiblionApp() {
   useEffect(() => {
     const canStepBack = () => !!readerBook || !!selectedBook || showSearch || showMyLibrary || showAddMenu || selectedShelf !== null || tab !== "books";
 
+    const resetToTabRoot = () => {
+      setReaderBook(null);
+      setSelectedBook(null);
+      setInsight(null);
+      cancelEditing();
+      setShowSearch(false);
+      setSearchResults([]);
+      setSearchQuery("");
+      setShowMyLibrary(false);
+      setShowAddMenu(false);
+      setSelectedShelf(null);
+      setShelfVolumes([]);
+      setVolumesError(null);
+    };
+
     const stepBack = () => {
-      if (readerBook) {
-        setReaderBook(null);
-        return true;
-      }
-      if (selectedBook) {
-        setSelectedBook(null);
-        setInsight(null);
-        cancelEditing();
-        return true;
-      }
-      if (showSearch) {
-        setShowSearch(false);
-        setSearchResults([]);
-        setSearchQuery("");
-        return true;
-      }
-      if (showMyLibrary) {
-        setShowMyLibrary(false);
-        setSelectedShelf(null);
-        setShelfVolumes([]);
-        setVolumesError(null);
-        return true;
-      }
-      if (showAddMenu) {
-        setShowAddMenu(false);
-        return true;
-      }
-      if (selectedShelf !== null) {
-        setSelectedShelf(null);
-        setShelfVolumes([]);
-        setVolumesError(null);
+      if (readerBook || selectedBook || showSearch || showMyLibrary || showAddMenu || selectedShelf !== null) {
+        resetToTabRoot();
         return true;
       }
       if (tab !== "books") {
