@@ -161,7 +161,7 @@ const IconSearch = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="
 const IconClose = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>);
 const IconBookmark = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>);
 
-function splitIntoSentenceChunks(text, minSentences = 1, maxSentences = 5) {
+function splitIntoSentenceChunks(text, minSentences = 1, maxSentences = 4, maxChars = 480) {
   const cleaned = (text || "").replace(/\s+/g, " ").trim();
   if (!cleaned) return [];
   const sentences = cleaned.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g)?.map(s => s.trim()).filter(Boolean) || [];
@@ -170,13 +170,15 @@ function splitIntoSentenceChunks(text, minSentences = 1, maxSentences = 5) {
   let i = 0;
   while (i < sentences.length) {
     const remaining = sentences.length - i;
-    let size = Math.min(maxSentences, remaining);
-    if (remaining > maxSentences && remaining < minSentences * 2) {
-      size = Math.ceil(remaining / 2);
-    } else if (remaining < minSentences && chunks.length) {
-      chunks[chunks.length - 1] = `${chunks[chunks.length - 1]} ${sentences.slice(i).join(" ")}`.trim();
-      break;
-    } else if (size < minSentences) {
+    let size = 1;
+    let len = sentences[i].length;
+    while (size < Math.min(maxSentences, remaining)) {
+      const next = sentences[i + size].length + 1;
+      if (len + next > maxChars && size >= minSentences) break;
+      len += next;
+      size++;
+    }
+    if (remaining - size < minSentences && remaining - size > 0 && remaining <= maxSentences) {
       size = remaining;
     }
     chunks.push(sentences.slice(i, i + size).join(" "));
@@ -240,7 +242,7 @@ function ReaderView({ book, chapterIdx, chapters, chunkIdx, onClose, onChapterCh
       <div style={{ height: 2, background: C.bgSurface, flexShrink: 0 }}>
         <div style={{ height: "100%", width: `${progress}%`, background: `linear-gradient(90deg, ${C.accent}, ${C.rose})`, transition: "width 0.3s ease" }} />
       </div>
-      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "28px 24px 40px", WebkitOverflowScrolling: "touch" }}>
+      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "20px 24px 24px", WebkitOverflowScrolling: "touch" }}>
         {book.source === "google-books" && !book.hasFullText && (
           <div style={{ background: C.bgSurface, borderRadius: 10, padding: "12px 16px", marginBottom: 24, fontSize: 13, color: C.textMid, lineHeight: 1.6, border: `1px solid ${C.border}` }} className="serif-body">
             Full text unavailable. Upload the EPUB or PDF directly if you want the whole book in chunks.
@@ -250,7 +252,7 @@ function ReaderView({ book, chapterIdx, chapters, chunkIdx, onClose, onChapterCh
           <>
             <div style={{ fontSize: 13, color: C.rose, fontWeight: 600, textTransform: "uppercase", letterSpacing: 2, marginBottom: 8, fontFamily: "'JetBrains Mono', monospace" }}>{chapter.chapterTitle}</div>
             <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 20 }}>{chunk.chunkLabel}</div>
-            <div style={{ fontSize: 17, color: C.text, lineHeight: 1.9, fontFamily: "'Libre Baskerville', Georgia, serif", whiteSpace: "pre-wrap" }}>{chunk.content}</div>
+            <div style={{ fontSize: 17, color: C.text, lineHeight: 1.7, fontFamily: "'Libre Baskerville', Georgia, serif", whiteSpace: "pre-wrap" }}>{chunk.content}</div>
           </>
         ) : (
           <div style={{ textAlign: "center", padding: 40, color: C.textDim, fontStyle: "italic" }}>No content available</div>
@@ -431,7 +433,7 @@ export default function BiblionApp() {
       const currentChapterIdx = book.id === readerBook?.id ? readerChapterIdx : (store.get(`biblion-reader-${book.id}`)?.chapterIdx || 0);
       const chapter = rawChapters[currentChapterIdx] || rawChapters[0];
       const chapterText = chapter?.content || book.textContent.slice(0, 12000);
-      const chapterChunks = splitIntoSentenceChunks(chapterText, 1, 5);
+      const chapterChunks = splitIntoSentenceChunks(chapterText, 1, 4);
       const recentBodies = (store.get(`biblion-passage-history-${book.id}-${currentChapterIdx}`) || []).slice(0, 8);
       const sys = `You are Biblion, a literary curator in a dusty, candlelit bookshop. Choose one passage from the supplied chapter text and present it in 5 sentences or fewer. Do not repeat any prior passage if a distinct option exists. Respond ONLY in JSON: {"title":"","body":"","page_hint":"","reflection":""}`;
       const usr = `Give me one memorable passage from this exact chapter in 5 sentences or fewer. The reader is currently on chapter: "${chapter?.title || `Chapter ${currentChapterIdx + 1}`}". Prefer a chunk that has not been used recently.\n\nRecent passages to avoid:\n${recentBodies.join("\n---\n") || "None"}\n\nCandidate chunks:\n${chapterChunks.map((chunk, i) => `[Chunk ${i + 1}] ${chunk}`).join("\n\n") || chapterText}`;
