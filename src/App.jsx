@@ -270,7 +270,7 @@ export default function BiblionApp() {
       const res = await fetch("https://www.googleapis.com/books/v1/mylibrary/bookshelves", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.status === 401) { disconnectGoogleBooks(); alert("Session expired — please reconnect in Settings."); return; }
+      if (res.status === 401) { disconnectGoogleBooks(); alert("Session expired — please reconnect in Settings."); setLoadingShelves(false); return; }
       const data = await res.json();
       setGoogleShelves(data.items || []);
     } catch (err) { alert("Could not load shelves: " + err.message); }
