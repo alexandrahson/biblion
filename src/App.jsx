@@ -133,6 +133,8 @@ export default function BiblionApp() {
   const [loadingShelves, setLoadingShelves] = useState(false);
   const [selectedShelf, setSelectedShelf] = useState(null);
   const [shelfVolumes, setShelfVolumes] = useState([]);
+  const [loadingVolumes, setLoadingVolumes] = useState(false);
+  const [volumesError, setVolumesError] = useState(null);
   const [showMyLibrary, setShowMyLibrary] = useState(false);
 
   // ── Load from localStorage + handle OAuth redirect ──
@@ -277,16 +279,19 @@ export default function BiblionApp() {
     setLoadingShelves(false);
   };
 
-  const fetchShelfVolumes = async (shelfId) => {
-    setSelectedShelf(shelfId); setShelfVolumes([]);
+  const fetchShelfVolumes = async (shelfId, token) => {
+    setSelectedShelf(shelfId); setShelfVolumes([]); setVolumesError(null); setLoadingVolumes(true);
     try {
       const res = await fetch(
         `https://www.googleapis.com/books/v1/mylibrary/bookshelves/${shelfId}/volumes?maxResults=40`,
-        { headers: { Authorization: `Bearer ${googleAccessToken}` } }
+        { headers: { Authorization: `Bearer ${token || googleAccessToken}` } }
       );
+      if (res.status === 401) { disconnectGoogleBooks(); setVolumesError("Session expired — please reconnect in Settings."); setLoadingVolumes(false); return; }
       const data = await res.json();
+      if (data.error) { setVolumesError(data.error.message); setLoadingVolumes(false); return; }
       setShelfVolumes(data.items || []);
-    } catch (err) { alert("Could not load shelf: " + err.message); }
+    } catch (err) { setVolumesError(err.message); }
+    setLoadingVolumes(false);
   };
 
   const addFromGoogleBooks = (item) => {
@@ -468,7 +473,7 @@ export default function BiblionApp() {
             {googleShelves.length > 0 && !selectedShelf && (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {googleShelves.map(shelf => (
-                  <div key={shelf.id} className="card" style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }} onClick={() => fetchShelfVolumes(shelf.id)}>
+                  <div key={shelf.id} className="card" style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }} onClick={() => fetchShelfVolumes(shelf.id, googleAccessToken)}>
                     <div>
                       <div style={{ fontSize: 15, fontWeight: 600 }}>{shelf.title}</div>
                       <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }} className="mono">{shelf.volumeCount} book{shelf.volumeCount !== 1 ? "s" : ""}</div>
@@ -480,8 +485,10 @@ export default function BiblionApp() {
             )}
             {selectedShelf !== null && (
               <>
-                <button className="btn-ghost" onClick={() => { setSelectedShelf(null); setShelfVolumes([]); }} style={{ marginBottom: 12, fontSize: 12 }}>‹ Shelves</button>
-                {shelfVolumes.length === 0 && <div style={{ textAlign: "center", padding: 24, color: C.textDim, fontSize: 14, fontStyle: "italic" }}>Loading…</div>}
+                <button className="btn-ghost" onClick={() => { setSelectedShelf(null); setShelfVolumes([]); setVolumesError(null); }} style={{ marginBottom: 12, fontSize: 12 }}>‹ Shelves</button>
+                {loadingVolumes && <Spinner />}
+                {volumesError && <div style={{ background: C.bgSurface, borderRadius: 8, padding: 14, fontSize: 13, color: C.rose, lineHeight: 1.6 }} className="serif-body">{volumesError}</div>}
+                {!loadingVolumes && !volumesError && shelfVolumes.length === 0 && <div style={{ textAlign: "center", padding: 24, color: C.textDim, fontSize: 14, fontStyle: "italic" }}>This shelf is empty</div>}
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {shelfVolumes.map(item => {
                     const info = item.volumeInfo;
