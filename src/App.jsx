@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import JSZip from "jszip";
 
 // ─── Dark Academia Palette ──────────────────────────────────────────
 const C = {
@@ -55,12 +56,20 @@ function extractTextFromPdfBytes(arrayBuffer) {
 
 async function extractTextFromEpub(arrayBuffer) {
   try {
-    const bytes = new Uint8Array(arrayBuffer);
-    const fullText = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
-    return fullText.replace(/<[^>]+>/g, " ")
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    const contentFiles = [];
+    zip.forEach((path, entry) => {
+      if (/\.(xhtml|html|htm)$/i.test(path) && !entry.dir) {
+        contentFiles.push(entry);
+      }
+    });
+    contentFiles.sort((a, b) => a.name.localeCompare(b.name));
+    const texts = await Promise.all(contentFiles.map(f => f.async("string")));
+    return texts.join("\n\n")
+      .replace(/<[^>]+>/g, " ")
       .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<")
       .replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#\d+;/g, " ")
-      .replace(/[^\x20-\x7E\n\r\t.,!?;:'"()\-\u2014\u2013]/g, " ").replace(/\s+/g, " ").trim()
+      .replace(/\s+/g, " ").trim()
       .slice(0, 80000);
   } catch { return "Could not parse EPUB."; }
 }
