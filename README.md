@@ -33,7 +33,7 @@ npm run dev
 
 ## Features
 
-- **The Stacks** — Upload EPUB/PDF books, generate curated insights (key ideas, passages, practical takeaways, surprises, connections)
+- **The Stacks** — Upload EPUB/PDF books, pull short passages, and read full books in saved sentence chunks
 - **Word Alcove** — Upload a dictionary file, learn a new word every 3 hours with etymology, examples, and mnemonics
 - **Offline-capable** — PWA with service worker for offline access
 - **Private** — API key stored only on your device, no backend server

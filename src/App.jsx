@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import JSZip from "jszip";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
@@ -159,6 +159,43 @@ const IconSettings = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill
 const IconPlus = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>);
 const IconSearch = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>);
 const IconClose = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>);
+const IconBookmark = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>);
+
+function splitIntoSentenceChunks(text, minSentences = 3, maxSentences = 5) {
+  const cleaned = (text || "").replace(/\s+/g, " ").trim();
+  if (!cleaned) return [];
+  const sentences = cleaned.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g)?.map(s => s.trim()).filter(Boolean) || [];
+  if (!sentences.length) return [];
+  const chunks = [];
+  let i = 0;
+  while (i < sentences.length) {
+    const remaining = sentences.length - i;
+    let size = Math.min(maxSentences, remaining);
+    if (remaining > maxSentences && remaining < minSentences * 2) {
+      size = Math.ceil(remaining / 2);
+    } else if (remaining < minSentences && chunks.length) {
+      chunks[chunks.length - 1] = `${chunks[chunks.length - 1]} ${sentences.slice(i).join(" ")}`.trim();
+      break;
+    } else if (size < minSentences) {
+      size = remaining;
+    }
+    chunks.push(sentences.slice(i, i + size).join(" "));
+    i += size;
+  }
+  return chunks;
+}
+
+function getChapterChunks(chapters) {
+  return (chapters || []).map((chapter, chapterIndex) => ({
+    chapterIndex,
+    chapterTitle: chapter.title || `Chapter ${chapterIndex + 1}`,
+    chunks: splitIntoSentenceChunks(chapter.content).map((content, chunkIndex, arr) => ({
+      content,
+      chunkIndex,
+      chunkLabel: `Chunk ${chunkIndex + 1}/${arr.length}`
+    }))
+  })).filter(ch => ch.chunks.length > 0);
+}
 
 const Spinner = () => (
   <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
@@ -175,60 +212,54 @@ const BookSpines = () => (
 );
 
 // ═══════════════════ READER VIEW ════════════════════════════════════
-function ReaderView({ book, chapterIdx, chapters, onClose, onChapterChange }) {
+function ReaderView({ book, chapterIdx, chapters, chunkIdx, onClose, onChapterChange, onChunkChange, onSaveChunk, savedChunkIds }) {
   const scrollRef = useRef(null);
   const chapter = chapters[chapterIdx];
+  const chunk = chapter?.chunks?.[chunkIdx];
 
-  useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [chapterIdx]);
+  useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [chapterIdx, chunkIdx]);
 
-  const renderContent = (text) =>
-    text.split("\n\n").filter(p => p.trim()).map((para, i) => {
-      const t = para.trim();
-      if (t.startsWith("## ") || t.startsWith("# "))
-        return <div key={i} style={{ fontSize: 18, fontWeight: 600, color: C.text, margin: "28px 0 10px", fontFamily: "'Libre Baskerville', Georgia, serif", lineHeight: 1.4 }}>{t.replace(/^#+\s*/, "")}</div>;
-      return <p key={i} style={{ margin: "0 0 22px", lineHeight: 1.9, fontSize: 17, color: C.text, fontFamily: "'Libre Baskerville', Georgia, serif" }}>{t}</p>;
-    });
-
-  const progress = chapters.length > 0 ? Math.round(((chapterIdx + 1) / chapters.length) * 100) : 0;
+  const progress = chapters.length > 0 ? Math.round(((chapterIdx + (chapter?.chunks?.length ? (chunkIdx + 1) / chapter.chunks.length : 0)) / chapters.length) * 100) : 0;
+  const chunkId = chapter && chunk ? `${book.id}:${chapter.chapterIndex}:${chunk.chunkIndex}` : null;
+  const isSaved = chunkId ? savedChunkIds.includes(chunkId) : false;
 
   return (
     <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: C.bg, zIndex: 200, display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto" }}>
-      {/* Header */}
       <div style={{ borderBottom: `1px solid ${C.border}`, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, background: C.bgCard }}>
         <button onClick={onClose} style={{ background: "none", border: "none", color: C.textMid, cursor: "pointer", fontSize: 22, lineHeight: 1, padding: "2px 6px", flexShrink: 0 }}>‹</button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'JetBrains Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.title}</div>
           <select value={chapterIdx} onChange={e => onChapterChange(+e.target.value)} style={{ fontSize: 14, color: C.text, background: "transparent", border: "none", outline: "none", cursor: "pointer", fontFamily: "'Cormorant Garamond', serif", width: "100%", marginTop: 1 }}>
-            {chapters.map((ch, i) => <option key={i} value={i} style={{ background: C.bgCard }}>{ch.title}</option>)}
+            {chapters.map((ch, i) => <option key={i} value={i} style={{ background: C.bgCard }}>{ch.chapterTitle}</option>)}
           </select>
         </div>
-        <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>{chapterIdx + 1}/{chapters.length}</div>
+        <button className="btn-ghost" onClick={() => chunk && onSaveChunk(chapter, chunk)} disabled={!chunk} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, padding: "8px 10px", color: isSaved ? C.gold : C.textMid, borderColor: isSaved ? C.gold : C.border }}>
+          <IconBookmark /> {isSaved ? "Saved" : "Save"}
+        </button>
       </div>
-      {/* Progress bar */}
       <div style={{ height: 2, background: C.bgSurface, flexShrink: 0 }}>
         <div style={{ height: "100%", width: `${progress}%`, background: `linear-gradient(90deg, ${C.accent}, ${C.rose})`, transition: "width 0.3s ease" }} />
       </div>
-      {/* Content */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "28px 24px 40px", WebkitOverflowScrolling: "touch" }}>
         {book.source === "google-books" && !book.hasFullText && (
           <div style={{ background: C.bgSurface, borderRadius: 10, padding: "12px 16px", marginBottom: 24, fontSize: 13, color: C.textMid, lineHeight: 1.6, border: `1px solid ${C.border}` }} className="serif-body">
-            Full text unavailable — Google Books only returned the description for this title. For complete reading, upload the EPUB or PDF directly.
+            Full text unavailable. Upload the EPUB or PDF directly if you want the whole book in chunks.
           </div>
         )}
-        {chapter ? (
+        {chapter && chunk ? (
           <>
-            <div style={{ fontSize: 13, color: C.rose, fontWeight: 600, textTransform: "uppercase", letterSpacing: 2, marginBottom: 20, fontFamily: "'JetBrains Mono', monospace" }}>{chapter.title}</div>
-            {renderContent(chapter.content)}
+            <div style={{ fontSize: 13, color: C.rose, fontWeight: 600, textTransform: "uppercase", letterSpacing: 2, marginBottom: 8, fontFamily: "'JetBrains Mono', monospace" }}>{chapter.chapterTitle}</div>
+            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 20 }}>{chunk.chunkLabel}</div>
+            <div style={{ fontSize: 17, color: C.text, lineHeight: 1.9, fontFamily: "'Libre Baskerville', Georgia, serif", whiteSpace: "pre-wrap" }}>{chunk.content}</div>
           </>
         ) : (
           <div style={{ textAlign: "center", padding: 40, color: C.textDim, fontStyle: "italic" }}>No content available</div>
         )}
       </div>
-      {/* Footer nav */}
       <div style={{ borderTop: `1px solid ${C.border}`, padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", background: C.bgCard, flexShrink: 0 }}>
-        <button className="btn-ghost" onClick={() => onChapterChange(chapterIdx - 1)} disabled={chapterIdx === 0} style={{ fontSize: 13, padding: "8px 14px" }}>‹ Prev</button>
-        <span style={{ fontSize: 11, color: C.textDim, fontFamily: "'JetBrains Mono', monospace" }}>{progress}%</span>
-        <button className="btn-ghost" onClick={() => onChapterChange(chapterIdx + 1)} disabled={chapterIdx === chapters.length - 1} style={{ fontSize: 13, padding: "8px 14px" }}>Next ›</button>
+        <button className="btn-ghost" onClick={() => onChunkChange(-1)} disabled={chapterIdx === 0 && chunkIdx === 0} style={{ fontSize: 13, padding: "8px 14px" }}>‹ Prev</button>
+        <span style={{ fontSize: 11, color: C.textDim, fontFamily: "'JetBrains Mono', monospace" }}>{chapter ? `${chapter.chapterIndex + 1}/${chapters.length} · ${chunk.chunkIndex + 1}/${chapter.chunks.length}` : `${progress}%`}</span>
+        <button className="btn-ghost" onClick={() => onChunkChange(1)} disabled={chapterIdx === chapters.length - 1 && chunkIdx === (chapter?.chunks?.length || 1) - 1} style={{ fontSize: 13, padding: "8px 14px" }}>Next ›</button>
       </div>
     </div>
   );
@@ -245,7 +276,8 @@ export default function BiblionApp() {
   const [currentWord, setCurrentWord] = useState(null);
   const [vocabHistory, setVocabHistory] = useState([]);
   const [lastWordTime, setLastWordTime] = useState(0);
-  const [insightType, setInsightType] = useState("key_idea");
+  const [savedPassages, setSavedPassages] = useState([]);
+  const [readerChunkIdx, setReaderChunkIdx] = useState(0);
   const [apiKey, setApiKey] = useState("");
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [apiBalanceInfo, setApiBalanceInfo] = useState(null);
@@ -280,6 +312,7 @@ export default function BiblionApp() {
     const cw = store.get("biblion-current-word"); if (cw) setCurrentWord(cw);
     const lt = store.get("biblion-last-word-time"); if (lt) setLastWordTime(lt);
     const k = store.get("biblion-api-key"); if (k) setApiKey(k);
+    const sp = store.get("biblion-saved-passages"); if (sp) setSavedPassages(sp);
     const gc = store.get("biblion-google-client-id"); if (gc) setGoogleClientId(gc);
     // Handle Google OAuth redirect (implicit flow — token in URL hash)
     const hash = window.location.hash;
@@ -337,13 +370,14 @@ export default function BiblionApp() {
     return false;
   };
 
-  const generateInsight = async (book, type) => {
+  const generatePassage = async (book) => {
     if (!ensureApiKey()) return;
     setLoading(true); setInsight(null);
-    const labels = { key_idea: "a key idea or concept", quote: "a powerful passage", practical: "a practical takeaway", surprise: "a surprising point", connection: "a connection to broader themes" };
     try {
-      const sys = `You are Biblion, a literary curator in a dusty, candlelit bookshop. Extract bite-sized, memorable insights with warmth and erudition. Respond ONLY in JSON: {"title":"","body":"","page_hint":"","reflection":""}`;
-      const usr = `Extract ${labels[type]} from this book. Be specific, warm, concise.\n\nBook: "${book.title}"\nText:\n${book.textContent.slice(0, 12000)}`;
+      const chapters = getChapterChunks(getChapters(book));
+      const chapterSample = chapters.find(ch => ch.chunks.length)?.chunks.slice(0, 2).map(c => c.content).join("\n\n") || book.textContent.slice(0, 12000);
+      const sys = `You are Biblion, a literary curator in a dusty, candlelit bookshop. Choose one passage from the supplied text and present it in 5 sentences or fewer. Respond ONLY in JSON: {"title":"","body":"","page_hint":"","reflection":""}`;
+      const usr = `Give me a memorable passage from the current chapter material in 5 sentences or fewer. Use the book's own language where possible, lightly trimmed only for brevity.\n\nBook: "${book.title}"\nText:\n${chapterSample}`;
       const raw = await askAI(sys, usr, apiKey);
       setInsight(JSON.parse(raw.replace(/```json|```/g, "").trim()));
       const u = books.map(b => b.id === book.id ? { ...b, insightCount: b.insightCount + 1 } : b);
@@ -553,15 +587,60 @@ export default function BiblionApp() {
     return [];
   };
 
+  const chapterChunks = useMemo(() => readerBook ? getChapterChunks(getChapters(readerBook)) : [], [readerBook]);
+
   const openReader = (book) => {
-    const saved = store.get(`biblion-reader-${book.id}`) || 0;
-    setReaderChapterIdx(saved);
+    const saved = store.get(`biblion-reader-${book.id}`) || { chapterIdx: 0, chunkIdx: 0 };
+    setReaderChapterIdx(saved.chapterIdx || 0);
+    setReaderChunkIdx(saved.chunkIdx || 0);
     setReaderBook(book);
   };
 
+  const persistReaderPosition = (bookId, chapterIdx, chunkIdx) => {
+    store.set(`biblion-reader-${bookId}`, { chapterIdx, chunkIdx });
+  };
+
   const goToChapter = (idx) => {
-    setReaderChapterIdx(idx);
-    if (readerBook) store.set(`biblion-reader-${readerBook.id}`, idx);
+    const safeIdx = Math.max(0, Math.min(idx, chapterChunks.length - 1));
+    setReaderChapterIdx(safeIdx);
+    setReaderChunkIdx(0);
+    if (readerBook) persistReaderPosition(readerBook.id, safeIdx, 0);
+  };
+
+  const moveReaderChunk = (direction) => {
+    if (!readerBook || !chapterChunks.length) return;
+    let nextChapter = readerChapterIdx;
+    let nextChunk = readerChunkIdx + direction;
+    if (nextChunk < 0) {
+      if (nextChapter === 0) return;
+      nextChapter -= 1;
+      nextChunk = chapterChunks[nextChapter].chunks.length - 1;
+    } else if (nextChunk >= chapterChunks[nextChapter].chunks.length) {
+      if (nextChapter === chapterChunks.length - 1) return;
+      nextChapter += 1;
+      nextChunk = 0;
+    }
+    setReaderChapterIdx(nextChapter);
+    setReaderChunkIdx(nextChunk);
+    persistReaderPosition(readerBook.id, nextChapter, nextChunk);
+  };
+
+  const savePassage = (book, chapter, chunk) => {
+    const entry = {
+      id: `${book.id}:${chapter.chapterIndex}:${chunk.chunkIndex}`,
+      bookId: book.id,
+      bookTitle: book.title,
+      chapterTitle: chapter.chapterTitle,
+      chapterIndex: chapter.chapterIndex,
+      chunkIndex: chunk.chunkIndex,
+      chunkLabel: chunk.chunkLabel,
+      content: chunk.content,
+      savedAt: new Date().toISOString()
+    };
+    const exists = savedPassages.some(p => p.id === entry.id);
+    const next = exists ? savedPassages : [entry, ...savedPassages];
+    setSavedPassages(next);
+    persist("biblion-saved-passages", next);
   };
 
   const spineColor = (title) => {
@@ -839,22 +918,29 @@ export default function BiblionApp() {
             ) : (
               <div onClick={() => startEditing("textPreview", selectedBook.textPreview)} style={{ fontSize: 13, color: C.textMid, marginBottom: 22, lineHeight: 1.6, cursor: "pointer", borderBottom: `1px dashed ${C.border}`, paddingBottom: 4 }} className="serif-body" title="Click to edit description">{selectedBook.textPreview}</div>
             )}
-            <div style={{ fontSize: 14, color: C.textMid, marginBottom: 10, fontStyle: "italic" }}>What would you like to discover?</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-              {[["key_idea","Key Idea"],["quote","Passage"],["practical","Practical"],["surprise","Surprise"],["connection","Connection"]].map(([v,l]) => (
-                <span key={v} className={`chip ${insightType === v ? "active" : ""}`} onClick={() => setInsightType(v)}>{l}</span>
-              ))}
+            <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+              <button className="btn-primary" onClick={() => generatePassage(selectedBook)} disabled={loading} style={{ flex: 1, width: "auto" }}>{loading ? "Finding a passage…" : "Passage"}</button>
+              <button className="btn-ghost" onClick={() => openReader(selectedBook)} style={{ flex: 1, padding: "0 18px" }}>Read Book ›</button>
             </div>
-            <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-              <button className="btn-primary" onClick={() => generateInsight(selectedBook, insightType)} disabled={loading} style={{ flex: 1, width: "auto" }}>{loading ? "Browsing the pages…" : "Open to a Page"}</button>
-              <button className="btn-ghost" onClick={() => openReader(selectedBook)} style={{ flexShrink: 0, padding: "0 18px" }}>Read ›</button>
-            </div>
+            {savedPassages.filter(p => p.bookId === selectedBook.id).length > 0 && (
+              <div style={{ marginBottom: 20, background: C.bgSurface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 }}>
+                <div style={{ fontSize: 12, color: C.gold, textTransform: "uppercase", letterSpacing: 2, marginBottom: 10 }} className="mono">Saved</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {savedPassages.filter(p => p.bookId === selectedBook.id).slice(0, 6).map(p => (
+                    <div key={p.id} style={{ borderLeft: `2px solid ${C.gold}`, paddingLeft: 10 }}>
+                      <div style={{ fontSize: 11, color: C.textDim }} className="mono">{p.chapterTitle} · {p.chunkLabel}</div>
+                      <div style={{ fontSize: 13, color: C.textMid, lineHeight: 1.6 }} className="serif-body">{p.content}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {loading && <Spinner />}
             {insight && !loading && (
               <div className="fade-up" style={{ marginTop: 22 }}>
                 <div className="insight-card">
                   <div style={{ position: "relative", zIndex: 1 }}>
-                    <div style={{ fontSize: 11, color: C.rose, fontWeight: 600, textTransform: "uppercase", letterSpacing: 2, marginBottom: 14 }} className="mono">From the Pages</div>
+                    <div style={{ fontSize: 11, color: C.rose, fontWeight: 600, textTransform: "uppercase", letterSpacing: 2, marginBottom: 14 }} className="mono">Passage</div>
                     <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 12, lineHeight: 1.35 }}>{insight.title}</div>
                     <div style={{ fontSize: 15, color: C.textMid, lineHeight: 1.75, marginBottom: 14 }} className="serif-body">{insight.body}</div>
                     {insight.page_hint && <div style={{ fontSize: 11, color: C.textDim }} className="mono">◆ {insight.page_hint}</div>}
@@ -1059,9 +1145,13 @@ export default function BiblionApp() {
         <ReaderView
           book={readerBook}
           chapterIdx={readerChapterIdx}
-          chapters={getChapters(readerBook)}
+          chapters={chapterChunks}
+          chunkIdx={readerChunkIdx}
           onClose={() => setReaderBook(null)}
           onChapterChange={goToChapter}
+          onChunkChange={moveReaderChunk}
+          onSaveChunk={(chapter, chunk) => savePassage(readerBook, chapter, chunk)}
+          savedChunkIds={savedPassages.map(p => p.id)}
         />
       )}
 
