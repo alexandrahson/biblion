@@ -793,7 +793,7 @@ export default function BiblionApp() {
                 {selectedBook.author && <div style={{ fontSize: 13, color: C.textMid, marginTop: 4, fontStyle: "italic" }}>{selectedBook.author}</div>}
               </div>
             </div>
-            <div style={{ fontSize: 11, color: C.textDim, marginBottom: 12, paddingLeft: selectedBook.coverUrl ? 68 : 18 }} className="mono">{selectedBook.insightCount} insights · {Math.round(selectedBook.textContent.length / 1000)}k chars</div>
+            <div style={{ fontSize: 11, color: C.textDim, marginBottom: 12, paddingLeft: selectedBook.coverUrl ? 68 : 18 }} className="mono">{Math.round(selectedBook.textContent.length / 1000)}k chars</div>
             {editingField === "textPreview" ? (
               <div style={{ marginBottom: 22 }}>
                 <textarea
