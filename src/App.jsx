@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import JSZip from "jszip";
 import * as pdfjsLib from "pdfjs-dist";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.mjs", import.meta.url).href;
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 // ─── Dark Academia Palette ──────────────────────────────────────────
 const C = {
@@ -42,7 +43,8 @@ async function extractTextFromPdfBytes(arrayBuffer) {
       if (text.trim()) pages.push(text);
     }
     return pages.join("\n\n").slice(0, 80000);
-  } catch {
+  } catch (e) {
+    console.error("PDF parse error:", e);
     return "Could not parse PDF.";
   }
 }
