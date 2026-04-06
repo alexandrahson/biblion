@@ -65,6 +65,69 @@ async function extractTextFromEpub(arrayBuffer) {
   } catch { return "Could not parse EPUB."; }
 }
 
+function domNodeToText(node) {
+  if (node.nodeType === 3) return node.textContent;
+  if (node.nodeType !== 1) return "";
+  const tag = node.tagName.toLowerCase();
+  if (["script","style","nav","aside","head"].includes(tag)) return "";
+  const inner = [...node.childNodes].map(domNodeToText).join("");
+  if (/^h[1-4]$/.test(tag)) return `\n\n## ${inner.trim()}\n\n`;
+  if (tag === "p") return `${inner.trim()}\n\n`;
+  if (tag === "br") return "\n";
+  if (["div","section","article","li"].includes(tag)) return `${inner.trim()}\n`;
+  return inner;
+}
+
+async function extractEpubChapters(arrayBuffer) {
+  try {
+    const JSZip = (await import("jszip")).default;
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    const containerFile = zip.file("META-INF/container.xml");
+    if (!containerFile) return null;
+    const containerXml = await containerFile.async("text");
+    const opfMatch = containerXml.match(/full-path="([^"]+\.opf)"/i);
+    if (!opfMatch) return null;
+    const opfPath = opfMatch[1];
+    const opfDir = opfPath.includes("/") ? opfPath.slice(0, opfPath.lastIndexOf("/") + 1) : "";
+    const opfFile = zip.file(opfPath);
+    if (!opfFile) return null;
+    const opfXml = await opfFile.async("text");
+    const parser = new DOMParser();
+    const opfDoc = parser.parseFromString(opfXml, "text/xml");
+    const manifest = {};
+    opfDoc.querySelectorAll("manifest item").forEach(item => {
+      manifest[item.getAttribute("id")] = item.getAttribute("href");
+    });
+    const spineIds = [...opfDoc.querySelectorAll("spine itemref")].map(r => r.getAttribute("idref"));
+    const chapters = [];
+    for (const id of spineIds) {
+      const href = manifest[id]; if (!href) continue;
+      const file = zip.file(opfDir + href) || zip.file(href); if (!file) continue;
+      const html = await file.async("text");
+      const doc = parser.parseFromString(html, "text/html");
+      const heading = doc.querySelector("h1,h2,h3");
+      const title = (heading?.textContent || doc.title || `Chapter ${chapters.length + 1}`).trim();
+      const text = domNodeToText(doc.body || doc.documentElement)
+        .replace(/\n{3,}/g, "\n\n").replace(/[ \t]+/g, " ").trim();
+      if (text.length > 100) chapters.push({ title, content: text });
+    }
+    return chapters.length > 0 ? chapters : null;
+  } catch { return null; }
+}
+
+function splitIntoPages(text, charsPerPage = 3000) {
+  const pages = []; let remaining = text.trim(); let i = 1;
+  while (remaining.length > 0) {
+    if (remaining.length <= charsPerPage) { pages.push({ title: `Page ${i}`, content: remaining }); break; }
+    let cut = remaining.lastIndexOf("\n\n", charsPerPage);
+    if (cut < charsPerPage * 0.4) cut = remaining.lastIndexOf(" ", charsPerPage);
+    if (cut <= 0) cut = charsPerPage;
+    pages.push({ title: `Page ${i}`, content: remaining.slice(0, cut).trim() });
+    remaining = remaining.slice(cut).trim(); i++;
+  }
+  return pages;
+}
+
 async function askAI(systemPrompt, userPrompt, apiKey) {
   const res = await fetch("https://api.deepseek.com/chat/completions", {
     method: "POST",
@@ -107,6 +170,61 @@ const BookSpines = () => (
   </div>
 );
 
+// ═══════════════════ READER VIEW ════════════════════════════════════
+function ReaderView({ book, chapterIdx, chapters, onClose, onChapterChange }) {
+  const scrollRef = useRef(null);
+  const chapter = chapters[chapterIdx];
+
+  useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [chapterIdx]);
+
+  const renderContent = (text) =>
+    text.split("\n\n").filter(p => p.trim()).map((para, i) => {
+      const t = para.trim();
+      if (t.startsWith("## ") || t.startsWith("# "))
+        return <div key={i} style={{ fontSize: 18, fontWeight: 600, color: C.text, margin: "28px 0 10px", fontFamily: "'Libre Baskerville', Georgia, serif", lineHeight: 1.4 }}>{t.replace(/^#+\s*/, "")}</div>;
+      return <p key={i} style={{ margin: "0 0 22px", lineHeight: 1.9, fontSize: 17, color: C.text, fontFamily: "'Libre Baskerville', Georgia, serif" }}>{t}</p>;
+    });
+
+  const progress = Math.round(((chapterIdx + 1) / chapters.length) * 100);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: C.bg, zIndex: 200, display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto" }}>
+      {/* Header */}
+      <div style={{ borderBottom: `1px solid ${C.border}`, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, background: C.bgCard }}>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: C.textMid, cursor: "pointer", fontSize: 22, lineHeight: 1, padding: "2px 6px", flexShrink: 0 }}>‹</button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'JetBrains Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.title}</div>
+          <select value={chapterIdx} onChange={e => onChapterChange(+e.target.value)} style={{ fontSize: 14, color: C.text, background: "transparent", border: "none", outline: "none", cursor: "pointer", fontFamily: "'Cormorant Garamond', serif", width: "100%", marginTop: 1 }}>
+            {chapters.map((ch, i) => <option key={i} value={i} style={{ background: C.bgCard }}>{ch.title}</option>)}
+          </select>
+        </div>
+        <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>{chapterIdx + 1}/{chapters.length}</div>
+      </div>
+      {/* Progress bar */}
+      <div style={{ height: 2, background: C.bgSurface, flexShrink: 0 }}>
+        <div style={{ height: "100%", width: `${progress}%`, background: `linear-gradient(90deg, ${C.accent}, ${C.rose})`, transition: "width 0.3s ease" }} />
+      </div>
+      {/* Content */}
+      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "28px 24px 40px", WebkitOverflowScrolling: "touch" }}>
+        {chapter ? (
+          <>
+            <div style={{ fontSize: 13, color: C.rose, fontWeight: 600, textTransform: "uppercase", letterSpacing: 2, marginBottom: 20, fontFamily: "'JetBrains Mono', monospace" }}>{chapter.title}</div>
+            {renderContent(chapter.content)}
+          </>
+        ) : (
+          <div style={{ textAlign: "center", padding: 40, color: C.textDim, fontStyle: "italic" }}>No content available</div>
+        )}
+      </div>
+      {/* Footer nav */}
+      <div style={{ borderTop: `1px solid ${C.border}`, padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", background: C.bgCard, flexShrink: 0 }}>
+        <button className="btn-ghost" onClick={() => onChapterChange(chapterIdx - 1)} disabled={chapterIdx === 0} style={{ fontSize: 13, padding: "8px 14px" }}>‹ Prev</button>
+        <span style={{ fontSize: 11, color: C.textDim, fontFamily: "'JetBrains Mono', monospace" }}>{progress}%</span>
+        <button className="btn-ghost" onClick={() => onChapterChange(chapterIdx + 1)} disabled={chapterIdx === chapters.length - 1} style={{ fontSize: 13, padding: "8px 14px" }}>Next ›</button>
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════ MAIN APP ═══════════════════════════════════════
 export default function BiblionApp() {
   const [tab, setTab] = useState("books");
@@ -136,6 +254,8 @@ export default function BiblionApp() {
   const [loadingVolumes, setLoadingVolumes] = useState(false);
   const [volumesError, setVolumesError] = useState(null);
   const [showMyLibrary, setShowMyLibrary] = useState(false);
+  const [readerBook, setReaderBook] = useState(null);
+  const [readerChapterIdx, setReaderChapterIdx] = useState(0);
 
   // ── Load from localStorage + handle OAuth redirect ──
   useEffect(() => {
@@ -169,8 +289,16 @@ export default function BiblionApp() {
     setLoading(true);
     try {
       const ab = await file.arrayBuffer();
-      const text = file.name.toLowerCase().endsWith(".epub") ? await extractTextFromEpub(ab) : extractTextFromPdfBytes(ab);
-      const nb = { id: Date.now().toString(), title: file.name.replace(/\.(epub|pdf)$/i, "").replace(/[_-]+/g, " "), fileName: file.name, textPreview: text.slice(0, 500), textContent: text, addedAt: new Date().toISOString(), insightCount: 0 };
+      const isEpub = file.name.toLowerCase().endsWith(".epub");
+      let text, chapters;
+      if (isEpub) {
+        chapters = await extractEpubChapters(ab);
+        text = chapters ? chapters.map(c => c.content).join("\n\n").slice(0, 80000) : await extractTextFromEpub(ab);
+      } else {
+        text = extractTextFromPdfBytes(ab);
+        chapters = splitIntoPages(text);
+      }
+      const nb = { id: Date.now().toString(), title: file.name.replace(/\.(epub|pdf)$/i, "").replace(/[_-]+/g, " "), fileName: file.name, textPreview: text.slice(0, 500), textContent: text, chapters: chapters || null, addedAt: new Date().toISOString(), insightCount: 0 };
       const u = [...books, nb]; setBooks(u); persist("biblion-books", u);
     } catch (err) { alert("Error: " + err.message); }
     setLoading(false); e.target.value = "";
@@ -322,6 +450,23 @@ export default function BiblionApp() {
     setShowSearch(false);
     setSearchQuery("");
     setSearchResults([]);
+  };
+
+  const getChapters = (book) => {
+    if (book?.chapters?.length) return book.chapters;
+    if (book?.textContent) return splitIntoPages(book.textContent);
+    return [];
+  };
+
+  const openReader = (book) => {
+    const saved = store.get(`biblion-reader-${book.id}`) || 0;
+    setReaderChapterIdx(saved);
+    setReaderBook(book);
+  };
+
+  const goToChapter = (idx) => {
+    setReaderChapterIdx(idx);
+    if (readerBook) store.set(`biblion-reader-${readerBook.id}`, idx);
   };
 
   const spineColor = (title) => {
@@ -575,7 +720,10 @@ export default function BiblionApp() {
                 <span key={v} className={`chip ${insightType === v ? "active" : ""}`} onClick={() => setInsightType(v)}>{l}</span>
               ))}
             </div>
-            <button className="btn-primary" onClick={() => generateInsight(selectedBook, insightType)} disabled={loading}>{loading ? "Browsing the pages…" : "Open to a Page"}</button>
+            <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+              <button className="btn-primary" onClick={() => generateInsight(selectedBook, insightType)} disabled={loading} style={{ flex: 1 }}>{loading ? "Browsing the pages…" : "Open to a Page"}</button>
+              <button className="btn-ghost" onClick={() => openReader(selectedBook)} style={{ flexShrink: 0, padding: "0 18px" }}>Read ›</button>
+            </div>
             {loading && <Spinner />}
             {insight && !loading && (
               <div className="fade-up" style={{ marginTop: 22 }}>
@@ -749,6 +897,17 @@ export default function BiblionApp() {
           </div>
         )}
       </div>
+
+      {/* Reader overlay */}
+      {readerBook && (
+        <ReaderView
+          book={readerBook}
+          chapterIdx={readerChapterIdx}
+          chapters={getChapters(readerBook)}
+          onClose={() => setReaderBook(null)}
+          onChapterChange={goToChapter}
+        />
+      )}
 
       {/* Tab Bar */}
       <div className="tab-bar">
