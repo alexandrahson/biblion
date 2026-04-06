@@ -215,6 +215,11 @@ function ReaderView({ book, chapterIdx, chapters, onClose, onChapterChange }) {
       </div>
       {/* Content */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "28px 24px 40px", WebkitOverflowScrolling: "touch" }}>
+        {book.source === "google-books" && !book.hasFullText && (
+          <div style={{ background: C.bgSurface, borderRadius: 10, padding: "12px 16px", marginBottom: 24, fontSize: 13, color: C.textMid, lineHeight: 1.6, border: `1px solid ${C.border}` }} className="serif-body">
+            Full text unavailable — Google Books only returned the description for this title. For complete reading, upload the EPUB or PDF directly.
+          </div>
+        )}
         {chapter ? (
           <>
             <div style={{ fontSize: 13, color: C.rose, fontWeight: 600, textTransform: "uppercase", letterSpacing: 2, marginBottom: 20, fontFamily: "'JetBrains Mono', monospace" }}>{chapter.title}</div>
@@ -262,6 +267,7 @@ export default function BiblionApp() {
   const [shelfVolumes, setShelfVolumes] = useState([]);
   const [loadingVolumes, setLoadingVolumes] = useState(false);
   const [volumesError, setVolumesError] = useState(null);
+  const [addingBookId, setAddingBookId] = useState(null);
   const [showMyLibrary, setShowMyLibrary] = useState(false);
   const [readerBook, setReaderBook] = useState(null);
   const [readerChapterIdx, setReaderChapterIdx] = useState(0);
@@ -431,16 +437,52 @@ export default function BiblionApp() {
     setLoadingVolumes(false);
   };
 
-  const addFromGoogleBooks = (item) => {
+  const addFromGoogleBooks = async (item) => {
     const info = item.volumeInfo;
-    const parts = [
-      `Title: ${info.title || "Unknown"}`,
-      info.authors ? `Author(s): ${info.authors.join(", ")}` : "",
-      info.publishedDate ? `Published: ${info.publishedDate}` : "",
-      info.categories ? `Categories: ${info.categories.join(", ")}` : "",
-      info.description ? `\nDescription:\n${info.description}` : "",
-    ].filter(Boolean);
-    const textContent = parts.join("\n");
+    const access = item.accessInfo;
+    setAddingBookId(item.id);
+
+    let textContent = null;
+    let chapters = null;
+
+    const downloadUrl = access?.epub?.downloadLink || access?.pdf?.downloadLink;
+    const isEpub = !!access?.epub?.downloadLink;
+
+    if (downloadUrl && googleAccessToken) {
+      try {
+        const res = await fetch("/api/book-download", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ downloadUrl, accessToken: googleAccessToken }),
+        });
+        if (res.ok) {
+          const { data } = await res.json();
+          const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+          const ab = bytes.buffer;
+          if (isEpub) {
+            chapters = await extractEpubChapters(ab);
+            textContent = chapters
+              ? chapters.map(c => c.content).join("\n\n").slice(0, 80000)
+              : await extractTextFromEpub(ab);
+          } else {
+            textContent = extractTextFromPdfBytes(ab);
+            chapters = splitIntoPages(textContent);
+          }
+        }
+      } catch {}
+    }
+
+    if (!textContent) {
+      const parts = [
+        `Title: ${info.title || "Unknown"}`,
+        info.authors ? `Author(s): ${info.authors.join(", ")}` : "",
+        info.publishedDate ? `Published: ${info.publishedDate}` : "",
+        info.categories ? `Categories: ${info.categories.join(", ")}` : "",
+        info.description ? `\nDescription:\n${info.description}` : "",
+      ].filter(Boolean);
+      textContent = parts.join("\n");
+    }
+
     const nb = {
       id: Date.now().toString(),
       title: info.title || "Unknown Title",
@@ -448,14 +490,17 @@ export default function BiblionApp() {
       fileName: "",
       textPreview: info.description?.slice(0, 500) || "No description available.",
       textContent,
+      chapters: chapters || null,
       addedAt: new Date().toISOString(),
       insightCount: 0,
       coverUrl: info.imageLinks?.thumbnail?.replace("http://", "https://") || null,
       source: "google-books",
+      hasFullText: !!chapters,
     };
     const u = [...books, nb];
     setBooks(u);
     persist("biblion-books", u);
+    setAddingBookId(null);
     setShowSearch(false);
     setSearchQuery("");
     setSearchResults([]);
@@ -601,8 +646,8 @@ export default function BiblionApp() {
                         {info.authors && <div style={{ fontSize: 12, color: C.textMid, marginBottom: 4 }}>{info.authors.join(", ")}</div>}
                         {info.description && <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }} className="serif-body">{info.description}</div>}
                       </div>
-                      <button onClick={() => addFromGoogleBooks(item)} disabled={alreadyAdded} style={{ alignSelf: "center", flexShrink: 0, background: alreadyAdded ? "transparent" : `linear-gradient(135deg, ${C.accent}, #4D8A8C)`, color: alreadyAdded ? C.textDim : "#fff", border: alreadyAdded ? `1px solid ${C.border}` : "none", borderRadius: 8, padding: "7px 12px", cursor: alreadyAdded ? "default" : "pointer", fontSize: 12, fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, whiteSpace: "nowrap" }}>
-                        {alreadyAdded ? "Shelved" : "+ Shelve"}
+                      <button onClick={() => addFromGoogleBooks(item)} disabled={alreadyAdded || addingBookId === item.id} style={{ alignSelf: "center", flexShrink: 0, background: alreadyAdded ? "transparent" : `linear-gradient(135deg, ${C.accent}, #4D8A8C)`, color: alreadyAdded ? C.textDim : "#fff", border: alreadyAdded ? `1px solid ${C.border}` : "none", borderRadius: 8, padding: "7px 12px", cursor: (alreadyAdded || addingBookId === item.id) ? "default" : "pointer", fontSize: 12, fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, whiteSpace: "nowrap", opacity: addingBookId === item.id ? 0.6 : 1 }}>
+                        {addingBookId === item.id ? "Adding…" : alreadyAdded ? "Shelved" : "+ Shelve"}
                       </button>
                     </div>
                   );
@@ -659,8 +704,8 @@ export default function BiblionApp() {
                           <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, marginBottom: 2 }}>{info.title}</div>
                           {info.authors && <div style={{ fontSize: 12, color: C.textMid }}>{info.authors.join(", ")}</div>}
                         </div>
-                        <button onClick={() => addFromGoogleBooks(item)} disabled={alreadyAdded} style={{ alignSelf: "center", flexShrink: 0, background: alreadyAdded ? "transparent" : `linear-gradient(135deg, ${C.accent}, #4D8A8C)`, color: alreadyAdded ? C.textDim : "#fff", border: alreadyAdded ? `1px solid ${C.border}` : "none", borderRadius: 8, padding: "7px 12px", cursor: alreadyAdded ? "default" : "pointer", fontSize: 12, fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, whiteSpace: "nowrap" }}>
-                          {alreadyAdded ? "Shelved" : "+ Shelve"}
+                        <button onClick={() => addFromGoogleBooks(item)} disabled={alreadyAdded || addingBookId === item.id} style={{ alignSelf: "center", flexShrink: 0, background: alreadyAdded ? "transparent" : `linear-gradient(135deg, ${C.accent}, #4D8A8C)`, color: alreadyAdded ? C.textDim : "#fff", border: alreadyAdded ? `1px solid ${C.border}` : "none", borderRadius: 8, padding: "7px 12px", cursor: (alreadyAdded || addingBookId === item.id) ? "default" : "pointer", fontSize: 12, fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, whiteSpace: "nowrap", opacity: addingBookId === item.id ? 0.6 : 1 }}>
+                          {addingBookId === item.id ? "Adding…" : alreadyAdded ? "Shelved" : "+ Shelve"}
                         </button>
                       </div>
                     );
