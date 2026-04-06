@@ -66,20 +66,10 @@ async function extractTextFromEpub(arrayBuffer) {
 }
 
 async function askAI(systemPrompt, userPrompt, apiKey) {
-  const res = await fetch("https://api.deepseek.com/chat/completions", {
+  const res = await fetch("/api/chat", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "deepseek-chat",
-      max_tokens: 1000,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ systemPrompt, userPrompt, apiKey }),
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
