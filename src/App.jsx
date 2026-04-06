@@ -266,6 +266,8 @@ export default function BiblionApp() {
   const [showMyLibrary, setShowMyLibrary] = useState(false);
   const [readerBook, setReaderBook] = useState(null);
   const [readerChapterIdx, setReaderChapterIdx] = useState(0);
+  const [editingField, setEditingField] = useState(null);
+  const [editValue, setEditValue] = useState("");
 
   // ── Load from localStorage + handle OAuth redirect ──
   useEffect(() => {
@@ -376,6 +378,22 @@ export default function BiblionApp() {
   const minsRem = minsLeft % 60;
 
   const deleteBook = async (id) => { const u = books.filter(b => b.id !== id); setBooks(u); persist("biblion-books", u); if (selectedBook?.id === id) setSelectedBook(null); };
+
+  const updateBook = (id, changes) => {
+    const u = books.map(b => b.id === id ? { ...b, ...changes } : b);
+    setBooks(u);
+    persist("biblion-books", u);
+    if (selectedBook?.id === id) setSelectedBook({ ...selectedBook, ...changes });
+  };
+
+  const startEditing = (field, value) => { setEditingField(field); setEditValue(value); };
+  const cancelEditing = () => { setEditingField(null); setEditValue(""); };
+  const saveEditing = (bookId) => {
+    if (editingField && editValue.trim()) {
+      updateBook(bookId, { [editingField]: editValue.trim() });
+    }
+    cancelEditing();
+  };
 
   const searchGoogleBooks = async (query) => {
     if (!query.trim()) return;
@@ -750,19 +768,51 @@ export default function BiblionApp() {
         {/* BOOK DETAIL */}
         {tab === "books" && selectedBook && (
           <div className="fade-up" style={{ paddingTop: 8 }}>
-            <button className="btn-ghost" onClick={() => { setSelectedBook(null); setInsight(null); }} style={{ marginBottom: 18 }}>‹ Back to the Stacks</button>
+            <button className="btn-ghost" onClick={() => { setSelectedBook(null); setInsight(null); cancelEditing(); }} style={{ marginBottom: 18 }}>‹ Back to the Stacks</button>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 4 }}>
               {selectedBook.coverUrl ? (
                 <img src={selectedBook.coverUrl} alt="" style={{ width: 54, height: 76, objectFit: "cover", borderRadius: 5, flexShrink: 0, opacity: 0.92 }} />
               ) : (
                 <div className="book-spine" style={{ background: spineColor(selectedBook.title), height: 36, alignSelf: "center" }} />
               )}
-              <div>
-                <div style={{ fontSize: 22, fontWeight: 600, lineHeight: 1.2 }}>{selectedBook.title}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {editingField === "title" ? (
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <input
+                      autoFocus
+                      value={editValue}
+                      onChange={e => setEditValue(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") saveEditing(selectedBook.id); if (e.key === "Escape") cancelEditing(); }}
+                      style={{ fontSize: 20, fontWeight: 600, background: C.bgSurface, border: `1px solid ${C.borderHover}`, borderRadius: 6, color: C.text, padding: "4px 8px", width: "100%", outline: "none" }}
+                    />
+                    <button className="btn-ghost" onClick={() => saveEditing(selectedBook.id)} style={{ padding: "4px 10px", fontSize: 12, flexShrink: 0 }}>Save</button>
+                    <button className="btn-ghost" onClick={cancelEditing} style={{ padding: "4px 10px", fontSize: 12, flexShrink: 0 }}>✕</button>
+                  </div>
+                ) : (
+                  <div onClick={() => startEditing("title", selectedBook.title)} style={{ fontSize: 22, fontWeight: 600, lineHeight: 1.2, cursor: "pointer", borderBottom: `1px dashed ${C.border}`, paddingBottom: 2 }} title="Click to edit title">{selectedBook.title}</div>
+                )}
                 {selectedBook.author && <div style={{ fontSize: 13, color: C.textMid, marginTop: 4, fontStyle: "italic" }}>{selectedBook.author}</div>}
               </div>
             </div>
-            <div style={{ fontSize: 11, color: C.textDim, marginBottom: 22, paddingLeft: selectedBook.coverUrl ? 68 : 18 }} className="mono">{selectedBook.insightCount} insights · {Math.round(selectedBook.textContent.length / 1000)}k chars</div>
+            <div style={{ fontSize: 11, color: C.textDim, marginBottom: 12, paddingLeft: selectedBook.coverUrl ? 68 : 18 }} className="mono">{selectedBook.insightCount} insights · {Math.round(selectedBook.textContent.length / 1000)}k chars</div>
+            {editingField === "textPreview" ? (
+              <div style={{ marginBottom: 22 }}>
+                <textarea
+                  autoFocus
+                  value={editValue}
+                  onChange={e => setEditValue(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Escape") cancelEditing(); }}
+                  rows={3}
+                  style={{ width: "100%", fontSize: 13, background: C.bgSurface, border: `1px solid ${C.borderHover}`, borderRadius: 6, color: C.text, padding: "8px 10px", outline: "none", resize: "vertical", lineHeight: 1.6, fontFamily: "inherit" }}
+                />
+                <div style={{ display: "flex", gap: 6, marginTop: 6, justifyContent: "flex-end" }}>
+                  <button className="btn-ghost" onClick={() => saveEditing(selectedBook.id)} style={{ padding: "4px 10px", fontSize: 12 }}>Save</button>
+                  <button className="btn-ghost" onClick={cancelEditing} style={{ padding: "4px 10px", fontSize: 12 }}>✕</button>
+                </div>
+              </div>
+            ) : (
+              <div onClick={() => startEditing("textPreview", selectedBook.textPreview)} style={{ fontSize: 13, color: C.textMid, marginBottom: 22, lineHeight: 1.6, cursor: "pointer", borderBottom: `1px dashed ${C.border}`, paddingBottom: 4 }} className="serif-body" title="Click to edit description">{selectedBook.textPreview}</div>
+            )}
             <div style={{ fontSize: 14, color: C.textMid, marginBottom: 10, fontStyle: "italic" }}>What would you like to discover?</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
               {[["key_idea","Key Idea"],["quote","Passage"],["practical","Practical"],["surprise","Surprise"],["connection","Connection"]].map(([v,l]) => (
