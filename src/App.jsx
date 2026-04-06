@@ -185,10 +185,10 @@ function ReaderView({ book, chapterIdx, chapters, onClose, onChapterChange }) {
       return <p key={i} style={{ margin: "0 0 22px", lineHeight: 1.9, fontSize: 17, color: C.text, fontFamily: "'Libre Baskerville', Georgia, serif" }}>{t}</p>;
     });
 
-  const progress = Math.round(((chapterIdx + 1) / chapters.length) * 100);
+  const progress = chapters.length > 0 ? Math.round(((chapterIdx + 1) / chapters.length) * 100) : 0;
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: C.bg, zIndex: 200, display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto" }}>
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: C.bg, zIndex: 200, display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto" }}>
       {/* Header */}
       <div style={{ borderBottom: `1px solid ${C.border}`, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, background: C.bgCard }}>
         <button onClick={onClose} style={{ background: "none", border: "none", color: C.textMid, cursor: "pointer", fontSize: 22, lineHeight: 1, padding: "2px 6px", flexShrink: 0 }}>‹</button>
@@ -721,7 +721,7 @@ export default function BiblionApp() {
               ))}
             </div>
             <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-              <button className="btn-primary" onClick={() => generateInsight(selectedBook, insightType)} disabled={loading} style={{ flex: 1 }}>{loading ? "Browsing the pages…" : "Open to a Page"}</button>
+              <button className="btn-primary" onClick={() => generateInsight(selectedBook, insightType)} disabled={loading} style={{ flex: 1, width: "auto" }}>{loading ? "Browsing the pages…" : "Open to a Page"}</button>
               <button className="btn-ghost" onClick={() => openReader(selectedBook)} style={{ flexShrink: 0, padding: "0 18px" }}>Read ›</button>
             </div>
             {loading && <Spinner />}
