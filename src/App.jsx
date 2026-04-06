@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import JSZip from "jszip";
+import * as pdfjsLib from "pdfjs-dist";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.mjs", import.meta.url).href;
 
 // ─── Dark Academia Palette ──────────────────────────────────────────
 const C = {
@@ -28,30 +31,20 @@ const store = {
   del: (key) => { try { localStorage.removeItem(key); } catch {} },
 };
 
-function extractTextFromPdfBytes(arrayBuffer) {
-  const bytes = new Uint8Array(arrayBuffer);
-  const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
-  const streams = [];
-  let idx = 0;
-  while (true) {
-    const start = text.indexOf("stream\n", idx);
-    if (start === -1) break;
-    const end = text.indexOf("endstream", start);
-    if (end === -1) break;
-    const chunk = text.slice(start + 7, end);
-    const readable = chunk.replace(/[^\x20-\x7E\n\r\t]/g, " ").replace(/\s+/g, " ").trim();
-    if (readable.length > 50) streams.push(readable);
-    idx = end + 9;
+async function extractTextFromPdfBytes(arrayBuffer) {
+  try {
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pages = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const text = content.items.map(item => item.str).join(" ");
+      if (text.trim()) pages.push(text);
+    }
+    return pages.join("\n\n").slice(0, 80000);
+  } catch {
+    return "Could not parse PDF.";
   }
-  const parenthetical = [];
-  const tjRegex = /\(([^)]{2,})\)/g;
-  let match;
-  while ((match = tjRegex.exec(text)) !== null) {
-    const clean = match[1].replace(/\\/g, "").trim();
-    if (clean.length > 1) parenthetical.push(clean);
-  }
-  const combined = parenthetical.length > streams.length ? parenthetical.join(" ") : streams.join("\n");
-  return combined.slice(0, 80000);
 }
 
 async function extractTextFromEpub(arrayBuffer) {
@@ -310,7 +303,7 @@ export default function BiblionApp() {
         chapters = await extractEpubChapters(ab);
         text = chapters ? chapters.map(c => c.content).join("\n\n").slice(0, 80000) : await extractTextFromEpub(ab);
       } else {
-        text = extractTextFromPdfBytes(ab);
+        text = await extractTextFromPdfBytes(ab);
         chapters = splitIntoPages(text);
       }
       const nb = { id: Date.now().toString(), title: file.name.replace(/\.(epub|pdf)$/i, "").replace(/[_-]+/g, " "), fileName: file.name, textPreview: text.slice(0, 500), textContent: text, chapters: chapters || null, addedAt: new Date().toISOString(), insightCount: 0 };
@@ -465,7 +458,7 @@ export default function BiblionApp() {
               ? chapters.map(c => c.content).join("\n\n").slice(0, 80000)
               : await extractTextFromEpub(ab);
           } else {
-            textContent = extractTextFromPdfBytes(ab);
+            textContent = await extractTextFromPdfBytes(ab);
             chapters = splitIntoPages(textContent);
           }
         }
