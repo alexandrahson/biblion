@@ -1230,7 +1230,7 @@ export default function BiblionApp() {
                     <div style={{ fontSize: 22, fontWeight: 600, marginBottom: 1 }}>{dictSearchResult.word}</div>
                     {dictSearchResult.pronunciation && <div style={{ fontSize: 12, color: C.textDim, marginBottom: 1 }} className="mono">{dictSearchResult.pronunciation}</div>}
                     {dictSearchResult.partOfSpeech && <div style={{ fontSize: 12, color: C.rose, fontStyle: "italic", marginBottom: 8 }}>{dictSearchResult.partOfSpeech}</div>}
-                    <div style={{ fontSize: 13, lineHeight: 1.6, color: C.text, marginBottom: 8 }} className="serif-body">{renderInlineText(dictSearchResult.definition, null, C.text)}</div>
+                    <div style={{ fontSize: 13, lineHeight: 1.6, color: C.text, marginBottom: 8 }} className="serif-body">{dictSearchResult.definition}</div>
                     {dictSearchResult.example && <div style={{ fontSize: 12, color: C.textMid, fontStyle: "italic", lineHeight: 1.5, marginBottom: 6 }} className="serif-body">{smartenQuotes(`"${dictSearchResult.example}"`)}</div>}
                     <button className="btn-ghost" onClick={addSearchWordToDict} style={{ fontSize: 12, padding: "5px 10px" }}>
                       {dictionary.some(w => w.word.toLowerCase() === dictSearchResult.word.toLowerCase()) ? "Already in lexicon" : "+ Add to Lexicon"}
@@ -1266,9 +1266,9 @@ export default function BiblionApp() {
                       <div style={{ fontSize: 26, fontWeight: 600, marginBottom: 1, letterSpacing: "0.3px" }}>{currentWord.word}</div>
                       {currentWord.pronunciation && <div style={{ fontSize: 12, color: C.textDim, marginBottom: 1 }} className="mono">{currentWord.pronunciation}</div>}
                       {currentWord.partOfSpeech && <div style={{ fontSize: 12, color: C.rose, fontStyle: "italic", marginBottom: 10 }}>{currentWord.partOfSpeech}</div>}
-                      <div style={{ fontSize: 14, lineHeight: 1.6, color: C.text, marginBottom: 10 }} className="serif-body">{renderInlineText(currentWord.definition, null, C.text)}</div>
+                      <div style={{ fontSize: 14, lineHeight: 1.6, color: C.text, marginBottom: 10 }} className="serif-body">{currentWord.definition}</div>
                       {currentWord.example && (<><div className="divider" style={{ margin: "8px 0" }} /><div style={{ fontSize: 13, color: C.textMid, fontStyle: "italic", lineHeight: 1.5, marginBottom: 8 }} className="serif-body">{smartenQuotes(`"${currentWord.example}"`)}</div></>)}
-                      {currentWord.etymology && <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.4 }} className="serif-body"><span style={{ color: C.gold }}>Origin</span> — {renderInlineText(currentWord.etymology, null, C.textDim)}</div>}
+                      {currentWord.etymology && <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.4 }} className="serif-body"><span style={{ color: C.gold }}>Origin</span> — {currentWord.etymology}</div>}
                     </div>
                   </div>
                 )}
@@ -1464,7 +1464,7 @@ export default function BiblionApp() {
               <button className="btn-ghost" onClick={() => setLookupModalWord("")} style={{ padding: "4px 8px", fontSize: 12 }}>✕</button>
             </div>
             {dictSearchResult.partOfSpeech && <div style={{ fontSize: 12, color: C.rose, fontStyle: "italic", marginBottom: 8 }}>{dictSearchResult.partOfSpeech}</div>}
-            <div style={{ fontSize: 14, color: C.text, lineHeight: 1.6 }} className="serif-body">{renderInlineText(dictSearchResult.definition, null, C.text)}</div>
+            <div style={{ fontSize: 14, color: C.text, lineHeight: 1.6 }} className="serif-body">{dictSearchResult.definition}</div>
             {dictSearchResult.example && <div style={{ fontSize: 12, color: C.textMid, fontStyle: "italic", lineHeight: 1.5, marginTop: 10 }} className="serif-body">{smartenQuotes(`"${dictSearchResult.example}"`)}</div>}
           </div>
         </div>
