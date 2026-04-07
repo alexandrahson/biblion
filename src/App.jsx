@@ -1433,7 +1433,7 @@ export default function BiblionApp() {
                 }
               }}>Clear All Data</button>
             </div>
-            <div style={{ height: 64 }} />
+            <div style={{ height: 24 }} />
           </div>
         )}
       </div>
