@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import JSZip from "jszip";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
+import { loadBooks, putBook, removeBook, clearAllBooks } from "./bookStore";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
@@ -408,9 +409,9 @@ export default function BiblionApp() {
   // Update module-level C on each render so all components see the current palette
   C = theme === "light" ? lightPalette : darkPalette;
 
-  // ── Load from localStorage + handle OAuth redirect ──
+  // ── Load from localStorage/IndexedDB + handle OAuth redirect ──
   useEffect(() => {
-    const b = store.get("biblion-books"); if (b) setBooks(b);
+    loadBooks().then(b => { if (b?.length) setBooks(b); }).catch(e => console.warn("Failed to load books:", e));
     const d = store.get("biblion-dict"); if (d) setDictionary(d);
     const v = store.get("biblion-vocab-history"); if (v) setVocabHistory(v);
     const cw = store.get("biblion-current-word"); if (cw) setCurrentWord(cw);
@@ -502,7 +503,8 @@ export default function BiblionApp() {
         chapters = splitIntoPages(text);
       }
       const nb = { id: Date.now().toString(), title: file.name.replace(/\.(epub|pdf)$/i, "").replace(/[_-]+/g, " "), fileName: file.name, textPreview: text.slice(0, 500), textContent: text, chapters: chapters || null, addedAt: new Date().toISOString(), insightCount: 0 };
-      const u = [...books, nb]; setBooks(u); persist("biblion-books", u);
+      await putBook(nb);
+      const u = [...books, nb]; setBooks(u);
     } catch (err) { alert("Error: " + err.message); }
     setLoading(false); e.target.value = "";
   };
@@ -572,7 +574,7 @@ export default function BiblionApp() {
       setInsight(parsed);
       persist(`biblion-passage-history-${book.id}-${currentChapterIdx}`, [parsed.body, ...recentBodies].slice(0, 12));
       const u = books.map(b => b.id === book.id ? { ...b, insightCount: b.insightCount + 1 } : b);
-      setBooks(u); persist("biblion-books", u);
+      setBooks(u); putBook(u.find(b => b.id === book.id)).catch(() => {});
     } catch (err) { setInsight({ title: "Error", body: err.message, page_hint: "", reflection: "" }); }
     setLoading(false);
   };
@@ -605,12 +607,13 @@ export default function BiblionApp() {
   const hrsLeft = Math.floor(minsLeft / 60);
   const minsRem = minsLeft % 60;
 
-  const deleteBook = async (id) => { const u = books.filter(b => b.id !== id); setBooks(u); persist("biblion-books", u); if (selectedBook?.id === id) setSelectedBook(null); };
+  const deleteBook = async (id) => { const u = books.filter(b => b.id !== id); setBooks(u); removeBook(id).catch(() => {}); if (selectedBook?.id === id) setSelectedBook(null); };
 
   const updateBook = (id, changes) => {
     const u = books.map(b => b.id === id ? { ...b, ...changes } : b);
     setBooks(u);
-    persist("biblion-books", u);
+    const updated = u.find(b => b.id === id);
+    if (updated) putBook(updated).catch(() => {});
     if (selectedBook?.id === id) setSelectedBook({ ...selectedBook, ...changes });
   };
 
@@ -772,9 +775,9 @@ export default function BiblionApp() {
       source: "google-books",
       hasFullText: !!chapters,
     };
+    try { await putBook(nb); } catch (e) { alert("Could not save book — storage may be full."); setAddingBookId(null); return; }
     const u = [...books, nb];
     setBooks(u);
-    persist("biblion-books", u);
     setAddingBookId(null);
     setShowSearch(false);
     setSearchQuery("");
@@ -1386,6 +1389,7 @@ export default function BiblionApp() {
               <button className="btn-ghost" style={{ fontSize: 13, color: "#C46B6B" }} onClick={() => {
                 if (confirm("Clear everything from the shop? This cannot be undone.")) {
                   setBooks([]); setDictionary([]); setVocabHistory([]); setCurrentWord(null); setLastWordTime(0);
+                  clearAllBooks().catch(() => {});
                   store.del("biblion-books"); store.del("biblion-dict"); store.del("biblion-vocab-history");
                   store.del("biblion-current-word"); store.del("biblion-last-word-time");
                 }
