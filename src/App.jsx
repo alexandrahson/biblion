@@ -1198,14 +1198,12 @@ export default function BiblionApp() {
 
             {dictionary.length === 0 ? (
               <div style={{ textAlign: "center", padding: "24px 16px" }}>
-                <div style={{ fontSize: 13, color: C.textMid, marginBottom: 12, lineHeight: 1.6 }} className="serif-body">Search words above to build your lexicon,<br/>or import a word list file.</div>
-                <button className="btn-ghost" onClick={() => dictInputRef.current?.click()} style={{ fontSize: 13, padding: "7px 14px" }}>Import Word List</button>
+                <div style={{ fontSize: 13, color: C.textMid, marginBottom: 12, lineHeight: 1.6 }} className="serif-body">Search words above to build your lexicon.</div>
               </div>
             ) : (
               <>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, marginTop: 10 }}>
                   <div style={{ fontSize: 11, color: C.textDim }} className="mono">{dictionary.length} words · {vocabHistory.length} learned</div>
-                  <button className="btn-ghost" onClick={() => dictInputRef.current?.click()} style={{ fontSize: 11, padding: "5px 10px" }}>Import / Replace</button>
                 </div>
                 {!wordReady && currentWord && (
                   <div style={{ background: C.bgSurface, borderRadius: 10, padding: 10, marginBottom: 10, textAlign: "center", fontSize: 13, color: C.textMid, border: `1px solid ${C.border}` }}>
