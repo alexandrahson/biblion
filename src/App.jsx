@@ -1252,8 +1252,8 @@ export default function BiblionApp() {
                 {vocabHistory.length > 1 && (
                   <>
                     <div className="divider-ornament" style={{ margin: "20px 0 22px" }}>· · ·</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: C.textMid, fontStyle: "italic" }}>Words you've collected</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 18, color: C.textMid, fontStyle: "italic" }}>Words you've collected</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingBottom: 32 }}>
                       {vocabHistory.slice(1, 11).map((w, i) => (
                         <div key={i} className="card" style={{ padding: 10 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
