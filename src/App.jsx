@@ -1409,7 +1409,7 @@ export default function BiblionApp() {
                 }
               }}>Clear All Data</button>
             </div>
-            <div style={{ marginTop: 20, marginBottom: 6, textAlign: "center", fontSize: 12, color: C.textDim, lineHeight: 1.6 }} className="serif-body">read in short form</div>
+            <div style={{ marginTop: 28, marginBottom: 28, textAlign: "center", fontSize: 12, color: C.textDim, lineHeight: 1.6 }} className="serif-body">read in short form</div>
           </div>
         )}
       </div>
