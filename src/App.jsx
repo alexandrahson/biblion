@@ -379,7 +379,7 @@ function ReaderView({ book, chapterIdx, chapters, chunkIdx, onClose, onChapterCh
 
 // ═══════════════════ MAIN APP ═══════════════════════════════════════
 export default function BiblionApp() {
-  const [tab, setTab] = useState("books");
+  const [tab, setTab] = useState(() => store.get("biblion-tab") || "books");
   const [books, setBooks] = useState([]);
   const [dictionary, setDictionary] = useState([]);
   const [selectedBook, setSelectedBook] = useState(null);
@@ -455,6 +455,10 @@ export default function BiblionApp() {
   }, []);
 
   const persist = (key, val) => store.set(key, val);
+
+  useEffect(() => {
+    persist("biblion-tab", tab);
+  }, [tab]);
 
   useEffect(() => {
     const canStepBack = () => !!readerBook || !!selectedBook || showSearch || showMyLibrary || showAddMenu || selectedShelf !== null || tab !== "books";
