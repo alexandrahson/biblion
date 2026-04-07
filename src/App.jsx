@@ -237,7 +237,7 @@ const BookSpines = () => (
 );
 
 // ═══════════════════ READER VIEW ════════════════════════════════════
-function ReaderView({ book, chapterIdx, chapters, chunkIdx, onClose, onChapterChange, onChunkChange, onSaveChunk, savedChunkIds }) {
+function ReaderView({ book, chapterIdx, chapters, chunkIdx, onClose, onChapterChange, onChunkChange, onSaveChunk, savedChunkIds, onWordTap }) {
   const scrollRef = useRef(null);
   const chapter = chapters[chapterIdx];
   const chunk = chapter?.chunks?.[chunkIdx];
@@ -275,7 +275,7 @@ function ReaderView({ book, chapterIdx, chapters, chunkIdx, onClose, onChapterCh
           <>
             <div style={{ fontSize: 13, color: C.rose, fontWeight: 600, textTransform: "uppercase", letterSpacing: 2, marginBottom: 8, fontFamily: "'JetBrains Mono', monospace" }}>{chapter.chapterTitle}</div>
             <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 20 }}>{chunk.chunkLabel}</div>
-            <div style={{ fontSize: 17, color: C.text, lineHeight: 1.7, fontFamily: "'Libre Baskerville', Georgia, serif", whiteSpace: "pre-wrap" }}>{chunk.content}</div>
+            <div style={{ fontSize: 17, color: C.text, lineHeight: 1.7, fontFamily: "'Libre Baskerville', Georgia, serif", whiteSpace: "pre-wrap" }}>{chunk.content.split(/(\b[A-Za-z][A-Za-z'’-]*\b)/g).map((part, i) => /^(\b[A-Za-z][A-Za-z'’-]*\b)$/.test(part) ? <button key={i} onClick={() => onWordTap?.(part)} style={{ background: "none", border: "none", color: C.text, padding: 0, margin: 0, font: "inherit", cursor: "pointer" }}>{part}</button> : <span key={i}>{part}</span>)}</div>
           </>
         ) : (
           <div style={{ textAlign: "center", padding: 40, color: C.textDim, fontStyle: "italic" }}>No content available</div>
@@ -314,6 +314,7 @@ export default function BiblionApp() {
   const [dictSearchResult, setDictSearchResult] = useState(null);
   const [dictSearching, setDictSearching] = useState(false);
   const [dictSearchError, setDictSearchError] = useState("");
+  const [lookupModalWord, setLookupModalWord] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -450,10 +451,11 @@ export default function BiblionApp() {
     setLoading(false); e.target.value = "";
   };
 
-  const lookupWord = async (word) => {
+  const lookupWord = async (word, options = {}) => {
     const q = (word || dictSearchQuery).trim().toLowerCase();
     if (!q) return;
     setDictSearching(true); setDictSearchError(""); setDictSearchResult(null);
+    if (options.openModal) setLookupModalWord(q);
     try {
       const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(q)}`);
       if (!res.ok) { setDictSearchError(res.status === 404 ? `"${q}" not found in dictionary.` : "Lookup failed. Try again."); setDictSearching(false); return; }
@@ -1077,7 +1079,7 @@ export default function BiblionApp() {
                   <div style={{ position: "relative", zIndex: 1 }}>
                     <div style={{ fontSize: 11, color: C.rose, fontWeight: 600, textTransform: "uppercase", letterSpacing: 2, marginBottom: 14 }} className="mono">Passage</div>
                     <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 12, lineHeight: 1.35 }}>{insight.title}</div>
-                    <div style={{ fontSize: 15, color: C.textMid, lineHeight: 1.75, marginBottom: 14 }} className="serif-body">{insight.body}</div>
+                    <div style={{ fontSize: 15, color: C.textMid, lineHeight: 1.75, marginBottom: 14 }} className="serif-body">{insight.body.split(/(\b[A-Za-z][A-Za-z'’-]*\b)/g).map((part, i) => /^(\b[A-Za-z][A-Za-z'’-]*\b)$/.test(part) ? <button key={i} onClick={() => lookupWord(part, { openModal: true })} style={{ background: "none", border: "none", color: C.textMid, padding: 0, margin: 0, font: "inherit", cursor: "pointer" }}>{part}</button> : <span key={i}>{part}</span>)}</div>
                     {insight.page_hint && <div style={{ fontSize: 11, color: C.textDim }} className="mono">◆ {insight.page_hint}</div>}
                     {insight.reflection && (<><div className="divider" /><div style={{ fontSize: 14, color: C.gold, fontStyle: "italic", lineHeight: 1.6 }} className="serif-body">{insight.reflection}</div></>)}
                   </div>
@@ -1156,7 +1158,6 @@ export default function BiblionApp() {
                       <div style={{ fontSize: 14, lineHeight: 1.6, color: C.text, marginBottom: 10 }} className="serif-body">{currentWord.definition}</div>
                       {currentWord.example && (<><div className="divider" style={{ margin: "8px 0" }} /><div style={{ fontSize: 13, color: C.textMid, fontStyle: "italic", lineHeight: 1.5, marginBottom: 8 }} className="serif-body">"{currentWord.example}"</div></>)}
                       {currentWord.etymology && <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.4 }} className="serif-body"><span style={{ color: C.gold }}>Origin</span> — {currentWord.etymology}</div>}
-                      {currentWord.mnemonic && <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.4, marginTop: 6 }} className="serif-body"><span style={{ color: C.accent }}>Remember</span> — {currentWord.mnemonic}</div>}
                     </div>
                   </div>
                 )}
@@ -1339,7 +1340,25 @@ export default function BiblionApp() {
           onChunkChange={moveReaderChunk}
           onSaveChunk={(chapter, chunk) => savePassage(readerBook, chapter, chunk)}
           savedChunkIds={savedPassages.map(p => p.id)}
+          onWordTap={(word) => lookupWord(word, { openModal: true })}
         />
+      )}
+
+      {lookupModalWord && dictSearchResult && (
+        <div onClick={() => setLookupModalWord("")} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div className="card" onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, padding: 18, background: C.bgCard }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: 22, fontWeight: 600 }}>{dictSearchResult.word}</div>
+                {dictSearchResult.pronunciation && <div style={{ fontSize: 12, color: C.textDim }} className="mono">{dictSearchResult.pronunciation}</div>}
+              </div>
+              <button className="btn-ghost" onClick={() => setLookupModalWord("")} style={{ padding: "4px 8px", fontSize: 12 }}>✕</button>
+            </div>
+            {dictSearchResult.partOfSpeech && <div style={{ fontSize: 12, color: C.rose, fontStyle: "italic", marginBottom: 8 }}>{dictSearchResult.partOfSpeech}</div>}
+            <div style={{ fontSize: 14, color: C.text, lineHeight: 1.6 }} className="serif-body">{dictSearchResult.definition}</div>
+            {dictSearchResult.example && <div style={{ fontSize: 12, color: C.textMid, fontStyle: "italic", lineHeight: 1.5, marginTop: 10 }} className="serif-body">"{dictSearchResult.example}"</div>}
+          </div>
+        </div>
       )}
 
       {/* Tab Bar */}
