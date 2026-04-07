@@ -386,7 +386,7 @@ function ReaderView({ book, chapterIdx, chapters, chunkIdx, onClose, onChapterCh
           <>
             <div style={{ fontSize: 13, color: C.rose, fontWeight: 600, textTransform: "uppercase", letterSpacing: 2, marginBottom: 8, fontFamily: "'JetBrains Mono', monospace" }}>{chapter.chapterTitle}</div>
             <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 20 }}>{chunk.chunkLabel}</div>
-            <div style={{ fontSize: 17, color: C.text, lineHeight: 1.7, fontFamily: "’Libre Baskerville’, Georgia, serif", whiteSpace: "pre-wrap" }}>{renderTappableWords(chunk.content, onWordTap, C.text)}</div>
+            <div style={{ fontSize: 17, color: C.text, lineHeight: 1.7, fontFamily: "'Libre Baskerville', Georgia, serif", whiteSpace: "pre-wrap" }}>{renderTappableWords(chunk.content, onWordTap, C.text)}</div>
           </>
         ) : (
           <div style={{ textAlign: "center", padding: 40, color: C.textDim, fontStyle: "italic" }}>No content available</div>
@@ -1264,7 +1264,7 @@ export default function BiblionApp() {
                 {currentWord && !loading && (
                   <div className="vocab-card fade-up" style={{ marginBottom: 14, padding: 18 }}>
                     <div style={{ position: "relative", zIndex: 1 }}>
-                      <div style={{ fontSize: 10, color: C.accent, fontWeight: 600, textTransform: "uppercase", letterSpacing: 2, marginBottom: 8 }} className="mono">Today's Word</div>
+                      <div style={{ fontSize: 10, color: C.accent, fontWeight: 600, textTransform: "uppercase", letterSpacing: 2, marginBottom: 8 }} className="mono">Today’s Word</div>
                       <div style={{ fontSize: 26, fontWeight: 600, marginBottom: 1, letterSpacing: "0.3px" }}>{currentWord.word}</div>
                       {currentWord.pronunciation && <div style={{ fontSize: 12, color: C.textDim, marginBottom: 1 }} className="mono">{currentWord.pronunciation}</div>}
                       {currentWord.partOfSpeech && <div style={{ fontSize: 12, color: C.rose, fontStyle: "italic", marginBottom: 10 }}>{currentWord.partOfSpeech}</div>}
@@ -1277,7 +1277,7 @@ export default function BiblionApp() {
                 {vocabHistory.length > 1 && (
                   <>
                     <div className="divider-ornament" style={{ margin: "20px 0 22px" }}>· · ·</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 18, color: C.textMid, fontStyle: "italic" }}>Words you've collected</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 18, color: C.textMid, fontStyle: "italic" }}>Words you’ve collected</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingBottom: 32 }}>
                       {vocabHistory.slice(1, 11).map((w, i) => (
                         <div key={i} className="card" style={{ padding: 10 }}>
