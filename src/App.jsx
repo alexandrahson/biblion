@@ -290,18 +290,42 @@ function getChapterChunks(chapters) {
   })).filter(ch => ch.chunks.length > 0);
 }
 
+function smartenQuotes(text) {
+  let out = "";
+  let openDouble = true;
+  let openSingle = true;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const prev = text[i - 1] || "";
+    const next = text[i + 1] || "";
+    if (ch === '"') {
+      out += openDouble ? '“' : '”';
+      openDouble = !openDouble;
+    } else if (ch === "'") {
+      const isApostrophe = /[A-Za-z]/.test(prev) && /[A-Za-z]/.test(next);
+      if (isApostrophe) out += '’';
+      else {
+        out += openSingle ? '‘' : '’';
+        openSingle = !openSingle;
+      }
+    } else out += ch;
+  }
+  return out;
+}
+
 // Render text with tappable words, keeping punctuation visually attached to adjacent words
 function renderTappableWords(text, onTap, color) {
-  const wordRe = /(\b[A-Za-z][A-Za-z''-]*\b)/g;
-  return text.split(/(\s+)/).map((token, i) => {
+  const smart = smartenQuotes(text || "");
+  const wordRe = /(\b[A-Za-z][A-Za-z’'-]*\b)/g;
+  return smart.split(/(\s+)/).map((token, i) => {
     if (/^\s+$/.test(token)) return <span key={i}>{token}</span>;
     const parts = token.split(wordRe);
-    if (parts.length <= 1) return <span key={i}>{token}</span>;
+    if (parts.length <= 1) return <span key={i} style={{ whiteSpace: "nowrap" }}>{token}</span>;
     return (
       <span key={i} style={{ whiteSpace: "nowrap" }}>
         {parts.map((p, j) =>
-          /^[A-Za-z][A-Za-z''-]*$/.test(p)
-            ? <button key={j} onClick={() => onTap?.(p)} style={{ background: "none", border: "none", color, padding: 0, margin: 0, font: "inherit", cursor: "pointer" }}>{p}</button>
+          /^[A-Za-z][A-Za-z’'-]*$/.test(p)
+            ? <button key={j} onClick={() => onTap?.(p.replace(/[’']/g, ""))} style={{ background: "none", border: "none", color, padding: 0, margin: 0, font: "inherit", cursor: "pointer" }}>{p}</button>
             : p ? <span key={j}>{p}</span> : null
         )}
       </span>
@@ -1409,7 +1433,7 @@ export default function BiblionApp() {
                 }
               }}>Clear All Data</button>
             </div>
-            <div style={{ marginTop: 28, marginBottom: 28, textAlign: "center", fontSize: 12, color: C.textDim, lineHeight: 1.6 }} className="serif-body">read in short form</div>
+            <div style={{ height: 42 }} />
           </div>
         )}
       </div>
