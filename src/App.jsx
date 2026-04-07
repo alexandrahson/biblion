@@ -546,12 +546,15 @@ export default function BiblionApp() {
   };
 
   const searchGoogleBooks = async (query) => {
-    if (!query.trim()) return;
+    const trimmed = query.trim();
+    if (!trimmed) return;
     setSearching(true);
     setSearchResults([]);
     try {
-      const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=12&printType=books`);
+      const q = `intitle:${trimmed} OR inauthor:${trimmed}`;
+      const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=12&printType=books`);
       const data = await res.json();
+      if (!res.ok) throw new Error(data?.error?.message || "Search failed.");
       setSearchResults(data.items || []);
     } catch (err) {
       alert("Search failed: " + err.message);
