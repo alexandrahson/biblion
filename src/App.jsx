@@ -1092,15 +1092,16 @@ export default function BiblionApp() {
           <div className="fade-up" style={{ paddingTop: 8 }}>
             {/* Dictionary Search */}
             <div style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
                 <input
+                  className="search-input"
                   value={dictSearchQuery}
                   onChange={e => setDictSearchQuery(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter") lookupWord(); }}
                   placeholder="Look up a word…"
-                  style={{ flex: 1, fontSize: 15, background: C.bgSurface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "9px 12px", outline: "none", fontFamily: "inherit" }}
+                  style={{ flex: 1 }}
                 />
-                <button className="btn-primary" onClick={() => lookupWord()} disabled={dictSearching} style={{ padding: "0 16px", flexShrink: 0, fontSize: 14 }}>
+                <button className="btn-primary" onClick={() => lookupWord()} disabled={dictSearching} style={{ width: "auto", padding: "0 18px", flexShrink: 0, fontSize: 14 }}>
                   {dictSearching ? "…" : "Look Up"}
                 </button>
               </div>
