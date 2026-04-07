@@ -125,6 +125,45 @@ async function extractEpubChapters(arrayBuffer) {
     opfDoc.querySelectorAll("manifest item").forEach(item => {
       manifest[item.getAttribute("id")] = item.getAttribute("href");
     });
+
+    // Build TOC label map from NCX (EPUB2) or nav (EPUB3)
+    const tocMap = {};
+    const ncxItem = opfDoc.querySelector('manifest item[media-type="application/x-dtbncx+xml"]');
+    const navItem = opfDoc.querySelector('manifest item[properties~="nav"]');
+    if (navItem) {
+      const navHref = navItem.getAttribute("href");
+      const navFile = zip.file(opfDir + navHref) || zip.file(navHref);
+      if (navFile) {
+        const navHtml = await navFile.async("text");
+        const navDoc = parser.parseFromString(navHtml, "text/html");
+        navDoc.querySelectorAll("nav[*|type='toc'] a, nav.toc a, nav#toc a").forEach(a => {
+          const href = (a.getAttribute("href") || "").split("#")[0];
+          const label = a.textContent.trim();
+          if (href && label) tocMap[href] = label;
+        });
+        if (Object.keys(tocMap).length === 0) {
+          navDoc.querySelectorAll("nav a").forEach(a => {
+            const href = (a.getAttribute("href") || "").split("#")[0];
+            const label = a.textContent.trim();
+            if (href && label) tocMap[href] = label;
+          });
+        }
+      }
+    }
+    if (Object.keys(tocMap).length === 0 && ncxItem) {
+      const ncxHref = ncxItem.getAttribute("href");
+      const ncxFile = zip.file(opfDir + ncxHref) || zip.file(ncxHref);
+      if (ncxFile) {
+        const ncxXml = await ncxFile.async("text");
+        const ncxDoc = parser.parseFromString(ncxXml, "text/xml");
+        ncxDoc.querySelectorAll("navPoint").forEach(np => {
+          const label = np.querySelector("navLabel text")?.textContent?.trim();
+          const src = (np.querySelector("content")?.getAttribute("src") || "").split("#")[0];
+          if (label && src) tocMap[src] = label;
+        });
+      }
+    }
+
     const spineIds = [...opfDoc.querySelectorAll("spine itemref")].map(r => r.getAttribute("idref"));
     const chapters = [];
     for (const id of spineIds) {
@@ -132,12 +171,33 @@ async function extractEpubChapters(arrayBuffer) {
       const file = zip.file(opfDir + href) || zip.file(href); if (!file) continue;
       const html = await file.async("text");
       const doc = parser.parseFromString(html, "text/html");
+      const tocLabel = tocMap[href];
       const heading = doc.querySelector("h1,h2,h3");
-      const title = (heading?.textContent || doc.title || `Chapter ${chapters.length + 1}`).trim();
+      const headingText = heading?.textContent?.trim();
+      const title = tocLabel || headingText || doc.title || "";
       const text = domNodeToText(doc.body || doc.documentElement)
         .replace(/\n{3,}/g, "\n\n").replace(/[ \t]+/g, " ").trim();
       if (text.length > 100) chapters.push({ title, content: text });
     }
+    // Deduplicate: if most titles are the same, they're probably the book title
+    if (chapters.length > 2) {
+      const freq = {};
+      chapters.forEach(c => { if (c.title) freq[c.title] = (freq[c.title] || 0) + 1; });
+      const maxTitle = Object.entries(freq).sort((a, b) => b[1] - a[1])[0];
+      if (maxTitle && maxTitle[1] > chapters.length * 0.4) {
+        const repeatedTitle = maxTitle[0];
+        let sectionNum = 1;
+        chapters.forEach(c => {
+          if (c.title === repeatedTitle) {
+            const firstLine = c.content.split("\n").find(l => l.trim().length > 0 && l.trim().length < 80);
+            c.title = firstLine?.trim() || `Section ${sectionNum}`;
+            sectionNum++;
+          }
+        });
+      }
+    }
+    // Final fallback for empty titles
+    chapters.forEach((c, i) => { if (!c.title) c.title = `Section ${i + 1}`; });
     return chapters.length > 0 ? chapters : null;
   } catch { return null; }
 }
@@ -145,12 +205,19 @@ async function extractEpubChapters(arrayBuffer) {
 function splitIntoPages(text, charsPerPage = 3000) {
   const pages = []; let remaining = text.trim(); let i = 1;
   while (remaining.length > 0) {
-    if (remaining.length <= charsPerPage) { pages.push({ title: `Page ${i}`, content: remaining }); break; }
-    let cut = remaining.lastIndexOf("\n\n", charsPerPage);
-    if (cut < charsPerPage * 0.4) cut = remaining.lastIndexOf(" ", charsPerPage);
-    if (cut <= 0) cut = charsPerPage;
-    pages.push({ title: `Page ${i}`, content: remaining.slice(0, cut).trim() });
-    remaining = remaining.slice(cut).trim(); i++;
+    let chunk;
+    if (remaining.length <= charsPerPage) { chunk = remaining; remaining = ""; }
+    else {
+      let cut = remaining.lastIndexOf("\n\n", charsPerPage);
+      if (cut < charsPerPage * 0.4) cut = remaining.lastIndexOf(" ", charsPerPage);
+      if (cut <= 0) cut = charsPerPage;
+      chunk = remaining.slice(0, cut).trim();
+      remaining = remaining.slice(cut).trim();
+    }
+    const firstLine = chunk.split("\n").find(l => l.trim().length > 2 && l.trim().length < 80);
+    const title = (firstLine?.trim() && firstLine.trim().length < 60) ? `${i}. ${firstLine.trim()}` : `Page ${i}`;
+    pages.push({ title, content: chunk });
+    i++;
   }
   return pages;
 }
