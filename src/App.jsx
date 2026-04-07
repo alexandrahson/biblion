@@ -1221,9 +1221,6 @@ export default function BiblionApp() {
               </div>
             ) : (
               <>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, marginTop: 10 }}>
-                  <div style={{ fontSize: 11, color: C.textDim }} className="mono">{dictionary.length} words · {vocabHistory.length} learned</div>
-                </div>
                 {!wordReady && currentWord && (
                   <div style={{ background: C.bgSurface, borderRadius: 10, padding: 10, marginBottom: 10, textAlign: "center", fontSize: 13, color: C.textMid, border: `1px solid ${C.border}` }}>
                     Next word arrives in <span style={{ color: C.accent, fontWeight: 600 }}>{hrsLeft > 0 ? `${hrsLeft}h ${minsRem}m` : `${minsLeft}m`}</span>
@@ -1396,10 +1393,7 @@ export default function BiblionApp() {
               )}
             </div>
 
-            <div className="card" style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, fontStyle: "italic" }}>About Biblion</div>
-              <div style={{ fontSize: 14, color: C.textMid, lineHeight: 1.7 }} className="serif-body">A candlelit corner of the internet where your books yield their secrets, one insight at a time. Powered by DeepSeek.</div>
-            </div>
+            <div style={{ marginTop: 18, marginBottom: 10, textAlign: "center", fontSize: 12, color: C.textDim, lineHeight: 1.6 }} className="serif-body">A candlelit corner of the internet where your books yield their secrets, one insight at a time.</div>
             <div className="card" style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 10, fontStyle: "italic" }}>Your Collection</div>
               <div style={{ fontSize: 14, color: C.textMid, marginBottom: 14 }} className="serif-body">{books.length} book{books.length !== 1 ? "s" : ""} shelved · {dictionary.length} words in lexicon · {vocabHistory.length} words learned</div>
