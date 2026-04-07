@@ -316,19 +316,19 @@ function smartenQuotes(text) {
 // Render text with tappable words, keeping punctuation visually attached to adjacent words
 function renderInlineText(text, onTap, color) {
   const smart = smartenQuotes(text || "");
-  const segments = smart.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
-  const wordRe = /(\b[A-Za-z][A-Za-z’'-]*\b)/g;
+  const segments = smart.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g).filter(Boolean);
+  const wordRe = /([A-Za-z][A-Za-z’'-]*)/g;
 
-  const renderToken = (token, keyPrefix, fontWeight) => {
+  const renderToken = (token, keyPrefix, style = {}) => {
     return token.split(/(\s+)/).map((piece, i) => {
       if (/^\s+$/.test(piece)) return <span key={`${keyPrefix}-s-${i}`}>{piece}</span>;
       const parts = piece.split(wordRe);
-      if (parts.length <= 1) return <span key={`${keyPrefix}-p-${i}`} style={{ whiteSpace: "nowrap", fontWeight }}>{piece}</span>;
+      if (parts.length <= 1) return <span key={`${keyPrefix}-p-${i}`} style={{ whiteSpace: "nowrap", ...style }}>{piece}</span>;
       return (
-        <span key={`${keyPrefix}-w-${i}`} style={{ whiteSpace: "nowrap", fontWeight }}>
+        <span key={`${keyPrefix}-w-${i}`} style={{ whiteSpace: "nowrap", ...style }}>
           {parts.map((p, j) =>
             /^[A-Za-z][A-Za-z’'-]*$/.test(p)
-              ? <button key={j} onClick={() => onTap?.(p.replace(/[’']/g, ""))} style={{ background: "none", border: "none", color, padding: 0, margin: 0, font: "inherit", fontWeight, cursor: "pointer" }}>{p}</button>
+              ? <button key={j} onClick={() => onTap?.(p.replace(/[’']/g, ""))} style={{ background: "none", border: "none", color, padding: 0, margin: 0, font: "inherit", ...style, cursor: "pointer" }}>{p}</button>
               : p ? <span key={j}>{p}</span> : null
           )}
         </span>
@@ -338,24 +338,12 @@ function renderInlineText(text, onTap, color) {
 
   return segments.map((segment, idx) => {
     const isBold = /^\*\*[^*]+\*\*$/.test(segment);
-    const content = isBold ? segment.slice(2, -2) : segment;
-    return <span key={`seg-${idx}`}>{renderToken(content, `seg-${idx}`, isBold ? 700 : undefined)}</span>;
+    const isItalic = !isBold && /^\*[^*]+\*$/.test(segment);
+    const content = isBold ? segment.slice(2, -2) : isItalic ? segment.slice(1, -1) : segment;
+    const style = isBold ? { fontWeight: 700 } : isItalic ? { fontStyle: "italic" } : {};
+    return <span key={`seg-${idx}`}>{renderToken(content, `seg-${idx}`, style)}</span>;
   });
 }
-
-const Spinner = () => (
-  <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
-    <div style={{ width: 28, height: 28, border: `2px solid ${C.bgSurface}`, borderTop: `2px solid ${C.accent}`, borderRadius: "50%", animation: "spin 0.9s linear infinite" }} />
-  </div>
-);
-
-const BookSpines = () => (
-  <div style={{ display: "flex", justifyContent: "center", gap: 3, marginBottom: 24, opacity: 0.5 }}>
-    {[{ w: 14, h: 64, bg: C.rose },{ w: 18, h: 72, bg: C.gold },{ w: 12, h: 58, bg: C.accent },{ w: 16, h: 68, bg: "#8B6B5A" },{ w: 20, h: 74, bg: C.rose },{ w: 13, h: 62, bg: "#5A4A3E" },{ w: 17, h: 70, bg: C.accent },{ w: 15, h: 66, bg: C.gold }].map((s, i) => (
-      <div key={i} style={{ width: s.w, height: s.h, background: s.bg, borderRadius: 2, alignSelf: "flex-end", opacity: 0.6 + i * 0.05, boxShadow: "inset -1px 0 2px rgba(0,0,0,0.3)" }} />
-    ))}
-  </div>
-);
 
 // ═══════════════════ READER VIEW ════════════════════════════════════
 function ReaderView({ book, chapterIdx, chapters, chunkIdx, onClose, onChapterChange, onChunkChange, onSaveChunk, savedChunkIds, onWordTap }) {
