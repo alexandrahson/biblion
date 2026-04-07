@@ -310,6 +310,10 @@ export default function BiblionApp() {
   const [apiBalanceError, setApiBalanceError] = useState("");
   const fileInputRef = useRef(null);
   const dictInputRef = useRef(null);
+  const [dictSearchQuery, setDictSearchQuery] = useState("");
+  const [dictSearchResult, setDictSearchResult] = useState(null);
+  const [dictSearching, setDictSearching] = useState(false);
+  const [dictSearchError, setDictSearchError] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -329,6 +333,7 @@ export default function BiblionApp() {
   const [readerChapterIdx, setReaderChapterIdx] = useState(0);
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState("");
+  const [editDescValue, setEditDescValue] = useState("");
   const backPressRef = useRef({ last: 0 });
   const [theme, setTheme] = useState(() => store.get("biblion-theme") || "dark");
 
@@ -445,6 +450,35 @@ export default function BiblionApp() {
     setLoading(false); e.target.value = "";
   };
 
+  const lookupWord = async (word) => {
+    const q = (word || dictSearchQuery).trim().toLowerCase();
+    if (!q) return;
+    setDictSearching(true); setDictSearchError(""); setDictSearchResult(null);
+    try {
+      const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(q)}`);
+      if (!res.ok) { setDictSearchError(res.status === 404 ? `"${q}" not found in dictionary.` : "Lookup failed. Try again."); setDictSearching(false); return; }
+      const data = await res.json();
+      const entry = data[0];
+      const phonetic = entry.phonetics?.find(p => p.text)?.text || "";
+      const meanings = entry.meanings || [];
+      const firstMeaning = meanings[0] || {};
+      const partOfSpeech = firstMeaning.partOfSpeech || "";
+      const definition = firstMeaning.definitions?.[0]?.definition || "";
+      const example = firstMeaning.definitions?.[0]?.example || "";
+      const allDefs = meanings.map(m => `(${m.partOfSpeech}) ${m.definitions?.[0]?.definition || ""}`).join("; ");
+      setDictSearchResult({ word: entry.word, pronunciation: phonetic, partOfSpeech, definition, allDefinitions: allDefs, example });
+    } catch (err) { setDictSearchError("Network error. Check your connection."); }
+    setDictSearching(false);
+  };
+
+  const addSearchWordToDict = () => {
+    if (!dictSearchResult) return;
+    const exists = dictionary.some(w => w.word.toLowerCase() === dictSearchResult.word.toLowerCase());
+    if (exists) return;
+    const updated = [...dictionary, { word: dictSearchResult.word, definition: dictSearchResult.allDefinitions || dictSearchResult.definition }];
+    setDictionary(updated); persist("biblion-dict", updated);
+  };
+
   const ensureApiKey = () => {
     if (apiKey) return true;
     setShowKeyInput(true);
@@ -512,9 +546,15 @@ export default function BiblionApp() {
   };
 
   const startEditing = (field, value) => { setEditingField(field); setEditValue(value); };
-  const cancelEditing = () => { setEditingField(null); setEditValue(""); };
+  const startEditingBoth = (title, desc) => { setEditingField("both"); setEditValue(title); setEditDescValue(desc); };
+  const cancelEditing = () => { setEditingField(null); setEditValue(""); setEditDescValue(""); };
   const saveEditing = (bookId) => {
-    if (editingField && editValue.trim()) {
+    if (editingField === "both") {
+      const changes = {};
+      if (editValue.trim()) changes.title = editValue.trim();
+      if (editDescValue.trim()) changes.textPreview = editDescValue.trim();
+      if (Object.keys(changes).length) updateBook(bookId, changes);
+    } else if (editingField && editValue.trim()) {
       updateBook(bookId, { [editingField]: editValue.trim() });
     }
     cancelEditing();
@@ -978,38 +1018,32 @@ export default function BiblionApp() {
                 <div className="book-spine" style={{ background: spineColor(selectedBook.title), height: 36, alignSelf: "center" }} />
               )}
               <div style={{ flex: 1, minWidth: 0 }}>
-                {editingField === "title" ? (
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <input
-                      autoFocus
-                      value={editValue}
-                      onChange={e => setEditValue(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter") saveEditing(selectedBook.id); if (e.key === "Escape") cancelEditing(); }}
-                      style={{ fontSize: 20, fontWeight: 600, background: C.bgSurface, border: `1px solid ${C.borderHover}`, borderRadius: 6, color: C.text, padding: "4px 8px", width: "100%", outline: "none" }}
-                    />
-                    <button className="btn-ghost" onClick={() => saveEditing(selectedBook.id)} style={{ padding: "4px 10px", fontSize: 12, flexShrink: 0 }}>Save</button>
-                    <button className="btn-ghost" onClick={cancelEditing} style={{ padding: "4px 10px", fontSize: 12, flexShrink: 0 }}>✕</button>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ fontSize: 22, fontWeight: 600, lineHeight: 1.2, paddingBottom: 2, flex: 1 }}>{selectedBook.title}</div>
-                    <button className="btn-ghost" onClick={() => startEditing("title", selectedBook.title)} style={{ padding: "4px 10px", fontSize: 12, flexShrink: 0 }}>Edit</button>
-                  </div>
-                )}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ fontSize: 22, fontWeight: 600, lineHeight: 1.2, paddingBottom: 2, flex: 1 }}>{selectedBook.title}</div>
+                  {editingField !== "both" && <button className="btn-ghost" onClick={() => startEditingBoth(selectedBook.title, selectedBook.textPreview || "")} style={{ padding: "4px 10px", fontSize: 12, flexShrink: 0 }}>Edit</button>}
+                </div>
                 {selectedBook.author && <div style={{ fontSize: 13, color: C.textMid, marginTop: 4, fontStyle: "italic" }}>{selectedBook.author}</div>}
               </div>
             </div>
-            {editingField === "textPreview" ? (
+            {editingField === "both" ? (
               <div style={{ marginBottom: 22 }}>
-                <textarea
+                <label style={{ fontSize: 11, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 4, display: "block" }} className="mono">Title</label>
+                <input
                   autoFocus
                   value={editValue}
                   onChange={e => setEditValue(e.target.value)}
                   onKeyDown={e => { if (e.key === "Escape") cancelEditing(); }}
-                  rows={3}
-                  style={{ width: "100%", fontSize: 13, background: C.bgSurface, border: `1px solid ${C.borderHover}`, borderRadius: 6, color: C.text, padding: "8px 10px", outline: "none", resize: "vertical", lineHeight: 1.6, fontFamily: "inherit" }}
+                  style={{ fontSize: 18, fontWeight: 600, background: C.bgSurface, border: `1px solid ${C.borderHover}`, borderRadius: 6, color: C.text, padding: "6px 10px", width: "100%", outline: "none", marginBottom: 12, boxSizing: "border-box" }}
                 />
-                <div style={{ display: "flex", gap: 6, marginTop: 6, justifyContent: "flex-end" }}>
+                <label style={{ fontSize: 11, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 4, display: "block" }} className="mono">Description</label>
+                <textarea
+                  value={editDescValue}
+                  onChange={e => setEditDescValue(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Escape") cancelEditing(); }}
+                  rows={3}
+                  style={{ width: "100%", fontSize: 13, background: C.bgSurface, border: `1px solid ${C.borderHover}`, borderRadius: 6, color: C.text, padding: "8px 10px", outline: "none", resize: "vertical", lineHeight: 1.6, fontFamily: "inherit", boxSizing: "border-box" }}
+                />
+                <div style={{ display: "flex", gap: 6, marginTop: 8, justifyContent: "flex-end" }}>
                   <button className="btn-ghost" onClick={() => saveEditing(selectedBook.id)} style={{ padding: "4px 10px", fontSize: 12 }}>Save</button>
                   <button className="btn-ghost" onClick={cancelEditing} style={{ padding: "4px 10px", fontSize: 12 }}>✕</button>
                 </div>
@@ -1017,7 +1051,6 @@ export default function BiblionApp() {
             ) : (
               <div style={{ marginBottom: 22 }}>
                 <div style={{ fontSize: 13, color: C.textMid, marginBottom: 8, lineHeight: 1.6, paddingBottom: 4 }} className="serif-body">{selectedBook.textPreview}</div>
-                <button className="btn-ghost" onClick={() => startEditing("textPreview", selectedBook.textPreview)} style={{ padding: "4px 10px", fontSize: 12 }}>Edit</button>
               </div>
             )}
             <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
@@ -1057,18 +1090,51 @@ export default function BiblionApp() {
         {/* VOCAB TAB */}
         {tab === "vocab" && (
           <div className="fade-up" style={{ paddingTop: 14 }}>
+            {/* Dictionary Search */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                <input
+                  value={dictSearchQuery}
+                  onChange={e => setDictSearchQuery(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") lookupWord(); }}
+                  placeholder="Look up a word…"
+                  style={{ flex: 1, fontSize: 15, background: C.bgSurface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "10px 14px", outline: "none", fontFamily: "inherit" }}
+                />
+                <button className="btn-primary" onClick={() => lookupWord()} disabled={dictSearching} style={{ padding: "0 18px", flexShrink: 0 }}>
+                  {dictSearching ? "…" : "Look Up"}
+                </button>
+              </div>
+              {dictSearchError && <div style={{ fontSize: 13, color: C.rose, marginBottom: 8 }}>{dictSearchError}</div>}
+              {dictSearchResult && (
+                <div className="vocab-card fade-up" style={{ marginBottom: 4 }}>
+                  <div style={{ position: "relative", zIndex: 1 }}>
+                    <div style={{ fontSize: 24, fontWeight: 600, marginBottom: 2 }}>{dictSearchResult.word}</div>
+                    {dictSearchResult.pronunciation && <div style={{ fontSize: 13, color: C.textDim, marginBottom: 2 }} className="mono">{dictSearchResult.pronunciation}</div>}
+                    {dictSearchResult.partOfSpeech && <div style={{ fontSize: 13, color: C.rose, fontStyle: "italic", marginBottom: 12 }}>{dictSearchResult.partOfSpeech}</div>}
+                    <div style={{ fontSize: 14, lineHeight: 1.7, color: C.text, marginBottom: 10 }} className="serif-body">{dictSearchResult.definition}</div>
+                    {dictSearchResult.example && <div style={{ fontSize: 13, color: C.textMid, fontStyle: "italic", lineHeight: 1.6, marginBottom: 10 }} className="serif-body">"{dictSearchResult.example}"</div>}
+                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                      <button className="btn-ghost" onClick={addSearchWordToDict} style={{ fontSize: 12, padding: "6px 12px" }}>
+                        {dictionary.some(w => w.word.toLowerCase() === dictSearchResult.word.toLowerCase()) ? "Already in lexicon" : "+ Add to Lexicon"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="divider" />
+
             {dictionary.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "56px 16px" }}>
-                <div style={{ fontSize: 36, marginBottom: 16, opacity: 0.3, letterSpacing: 8, fontStyle: "italic" }}>A B C</div>
-                <div style={{ fontSize: 21, fontWeight: 500, marginBottom: 8, fontStyle: "italic" }}>No lexicon yet</div>
-                <div style={{ fontSize: 14, color: C.textMid, marginBottom: 28, lineHeight: 1.7 }} className="serif-body">Upload a word list to begin.<br/>One word per line, definitions optional.</div>
-                <button className="btn-primary" onClick={() => dictInputRef.current?.click()}>Import Your Lexicon</button>
+              <div style={{ textAlign: "center", padding: "32px 16px" }}>
+                <div style={{ fontSize: 14, color: C.textMid, marginBottom: 16, lineHeight: 1.7 }} className="serif-body">Search words above to build your lexicon,<br/>or import a word list file.</div>
+                <button className="btn-ghost" onClick={() => dictInputRef.current?.click()} style={{ fontSize: 13, padding: "8px 16px" }}>Import Word List</button>
               </div>
             ) : (
               <>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, marginTop: 16 }}>
                   <div style={{ fontSize: 12, color: C.textDim }} className="mono">{dictionary.length} words · {vocabHistory.length} learned</div>
-                  <button className="btn-ghost" onClick={() => dictInputRef.current?.click()} style={{ fontSize: 12, padding: "6px 12px" }}>Replace</button>
+                  <button className="btn-ghost" onClick={() => dictInputRef.current?.click()} style={{ fontSize: 12, padding: "6px 12px" }}>Import / Replace</button>
                 </div>
                 {!wordReady && currentWord && (
                   <div style={{ background: C.bgSurface, borderRadius: 12, padding: 14, marginBottom: 16, textAlign: "center", fontSize: 14, color: C.textMid, border: `1px solid ${C.border}` }}>
