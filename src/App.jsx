@@ -1393,7 +1393,6 @@ export default function BiblionApp() {
               )}
             </div>
 
-            <div style={{ marginTop: 18, marginBottom: 10, textAlign: "center", fontSize: 12, color: C.textDim, lineHeight: 1.6 }} className="serif-body">A candlelit corner of the internet where your books yield their secrets, one insight at a time.</div>
             <div className="card" style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 10, fontStyle: "italic" }}>Your Collection</div>
               <div style={{ fontSize: 14, color: C.textMid, marginBottom: 14 }} className="serif-body">{books.length} book{books.length !== 1 ? "s" : ""} shelved · {dictionary.length} words in lexicon · {vocabHistory.length} words learned</div>
@@ -1406,6 +1405,7 @@ export default function BiblionApp() {
                 }
               }}>Clear All Data</button>
             </div>
+            <div style={{ marginTop: 20, marginBottom: 6, textAlign: "center", fontSize: 12, color: C.textDim, lineHeight: 1.6 }} className="serif-body">read in short form</div>
           </div>
         )}
       </div>
