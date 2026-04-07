@@ -5,25 +5,48 @@ import pdfjsWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
-// ─── Dark Academia Palette ──────────────────────────────────────────
-const C = {
-  bg:        "#1C1612",
-  bgCard:    "#261E18",
-  bgSurface: "#322820",
-  bgInset:   "#1A1410",
-  accent:    "#5F9EA0",
-  accentSoft:"rgba(95,158,160,0.12)",
-  rose:      "#C4868B",
-  roseSoft:  "rgba(196,134,139,0.12)",
-  roseGlow:  "rgba(196,134,139,0.06)",
-  gold:      "#B89A6A",
-  goldSoft:  "rgba(184,154,106,0.1)",
-  text:      "#E8DDD0",
-  textMid:   "#A99484",
-  textDim:   "#6E5D50",
-  border:    "rgba(184,154,106,0.1)",
+// ─── Palettes ──────────────────────────────────────────────────────
+const darkPalette = {
+  bg:         "#1C1612",
+  bgCard:     "#261E18",
+  bgSurface:  "#322820",
+  bgInset:    "#1A1410",
+  accent:     "#5F9EA0",
+  accentSoft: "rgba(95,158,160,0.12)",
+  rose:       "#C4868B",
+  roseSoft:   "rgba(196,134,139,0.12)",
+  roseGlow:   "rgba(196,134,139,0.06)",
+  gold:       "#B89A6A",
+  goldSoft:   "rgba(184,154,106,0.1)",
+  text:       "#E8DDD0",
+  textMid:    "#A99484",
+  textDim:    "#6E5D50",
+  border:     "rgba(184,154,106,0.1)",
   borderHover:"rgba(184,154,106,0.22)",
+  tabBarBg:   "linear-gradient(180deg, rgba(28,22,18,0.9) 0%, rgba(28,22,18,0.98) 100%)",
 };
+
+const lightPalette = {
+  bg:         "#F4EDE5",
+  bgCard:     "#EBE1D6",
+  bgSurface:  "#E0D3C5",
+  bgInset:    "#F8F2EB",
+  accent:     "#4A8486",
+  accentSoft: "rgba(74,132,134,0.10)",
+  rose:       "#B06E73",
+  roseSoft:   "rgba(176,110,115,0.10)",
+  roseGlow:   "rgba(176,110,115,0.05)",
+  gold:       "#8D7345",
+  goldSoft:   "rgba(141,115,69,0.10)",
+  text:       "#2C221A",
+  textMid:    "#6B5B4E",
+  textDim:    "#9A8A7C",
+  border:     "rgba(141,115,69,0.12)",
+  borderHover:"rgba(141,115,69,0.25)",
+  tabBarBg:   "linear-gradient(180deg, rgba(244,237,229,0.92) 0%, rgba(244,237,229,0.98) 100%)",
+};
+
+let C = darkPalette;
 
 // ─── Storage helpers (localStorage for standalone) ──────────────────
 const store = {
@@ -307,6 +330,10 @@ export default function BiblionApp() {
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState("");
   const backPressRef = useRef({ last: 0 });
+  const [theme, setTheme] = useState(() => store.get("biblion-theme") || "dark");
+
+  // Update module-level C on each render so all components see the current palette
+  C = theme === "light" ? lightPalette : darkPalette;
 
   // ── Load from localStorage + handle OAuth redirect ──
   useEffect(() => {
@@ -734,13 +761,13 @@ export default function BiblionApp() {
         .btn-ghost:active { background: ${C.bgSurface}; }
         .chip { display: inline-block; padding: 7px 16px; border-radius: 20px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid ${C.border}; color: ${C.textMid}; background: transparent; transition: all 0.2s ease; font-family: 'Cormorant Garamond', serif; }
         .chip.active { background: ${C.accent}; color: #fff; border-color: ${C.accent}; }
-        .tab-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); max-width: 480px; width: 100%; background: linear-gradient(180deg, rgba(28,22,18,0.9) 0%, rgba(28,22,18,0.98) 100%); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-top: 1px solid ${C.border}; display: flex; justify-content: space-around; padding: 8px 0 28px; z-index: 100; }
+        .tab-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); max-width: 480px; width: 100%; background: ${C.tabBarBg}; backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-top: 1px solid ${C.border}; display: flex; justify-content: space-around; padding: 8px 0 28px; z-index: 100; }
         .tab-item { display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: none; color: ${C.textDim}; cursor: pointer; font-family: 'Cormorant Garamond', serif; font-size: 11px; font-weight: 500; padding: 6px 20px; transition: color 0.2s ease; position: relative; }
         .tab-item.active { color: ${C.rose}; }
-        .insight-card { background: linear-gradient(145deg, ${C.bgCard} 0%, #2A201A 50%, ${C.bgCard} 100%); border: 1px solid ${C.borderHover}; border-radius: 16px; padding: 24px; position: relative; overflow: hidden; }
+        .insight-card { background: linear-gradient(145deg, ${C.bgCard} 0%, ${C.bgSurface} 50%, ${C.bgCard} 100%); border: 1px solid ${C.borderHover}; border-radius: 16px; padding: 24px; position: relative; overflow: hidden; }
         .insight-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, ${C.accent}, ${C.rose}, ${C.gold}); opacity: 0.6; }
         .insight-card::after { content: ''; position: absolute; top: -60px; right: -60px; width: 160px; height: 160px; border-radius: 50%; background: radial-gradient(circle, ${C.roseSoft} 0%, transparent 70%); pointer-events: none; }
-        .vocab-card { background: linear-gradient(145deg, #2A201A 0%, ${C.bgCard} 100%); border: 1px solid rgba(95,158,160,0.2); border-radius: 16px; padding: 24px; position: relative; overflow: hidden; }
+        .vocab-card { background: linear-gradient(145deg, ${C.bgSurface} 0%, ${C.bgCard} 100%); border: 1px solid rgba(95,158,160,0.2); border-radius: 16px; padding: 24px; position: relative; overflow: hidden; }
         .vocab-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, ${C.accent}, ${C.gold}); opacity: 0.5; }
         .vocab-card::after { content: ''; position: absolute; bottom: -40px; left: -40px; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, ${C.accentSoft} 0%, transparent 70%); pointer-events: none; }
         .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
@@ -1090,6 +1117,33 @@ export default function BiblionApp() {
         {/* SETTINGS */}
         {tab === "settings" && (
           <div className="fade-up" style={{ paddingTop: 14 }}>
+            {/* Appearance */}
+            <div className="card" style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 10, fontStyle: "italic" }}>Appearance</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {[["dark", "Dark"], ["light", "Light"]].map(([id, label]) => (
+                  <button
+                    key={id}
+                    onClick={() => { setTheme(id); store.set("biblion-theme", id); }}
+                    style={{
+                      flex: 1,
+                      padding: "10px 14px",
+                      borderRadius: 8,
+                      border: `1.5px solid ${theme === id ? C.accent : C.border}`,
+                      background: theme === id ? C.accentSoft : "transparent",
+                      color: theme === id ? C.accent : C.textMid,
+                      fontFamily: "'Cormorant Garamond', serif",
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             {/* API Key Card */}
             <div className="card" style={{ marginBottom: 12, borderColor: !apiKey ? "rgba(196,134,139,0.3)" : C.border }}>
               <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, fontStyle: "italic" }}>
