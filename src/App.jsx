@@ -947,7 +947,7 @@ export default function BiblionApp() {
           <div className="fade-up" style={{ paddingTop: 14, marginBottom: 12 }}>
             <div className="card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ fontSize: 15, fontWeight: 600, fontStyle: "italic" }}>Add a book</div>
-              <button className="btn-ghost" onClick={() => { setShowAddMenu(false); fileInputRef.current?.click(); }}>Upload EPUB or PDF</button>
+              <button className="btn-rose" onClick={() => { setShowAddMenu(false); fileInputRef.current?.click(); }}>Upload EPUB or PDF</button>
               {googleAccessToken && <button className="btn-primary" onClick={() => { setShowAddMenu(false); setShowMyLibrary(true); }}>My Google Library</button>}
             </div>
           </div>
