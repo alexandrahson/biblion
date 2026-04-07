@@ -1284,7 +1284,7 @@ export default function BiblionApp() {
                             <span style={{ fontSize: 15, fontWeight: 600 }}>{w.word}</span>
                             <span style={{ fontSize: 10, color: C.textDim }} className="mono">{w.partOfSpeech}</span>
                           </div>
-                          <div style={{ fontSize: 12, color: C.textMid, marginTop: 3, lineHeight: 1.4 }} className="serif-body">{w.definition}</div>
+                          <div style={{ fontSize: 12, color: C.textMid, marginTop: 3, lineHeight: 1.4 }} className="serif-body">{smartenQuotes(w.definition)}</div>
                         </div>
                       ))}
                     </div>
