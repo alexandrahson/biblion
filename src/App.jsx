@@ -1089,90 +1089,88 @@ export default function BiblionApp() {
 
         {/* VOCAB TAB */}
         {tab === "vocab" && (
-          <div className="fade-up" style={{ paddingTop: 14 }}>
+          <div className="fade-up" style={{ paddingTop: 8 }}>
             {/* Dictionary Search */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
                 <input
                   value={dictSearchQuery}
                   onChange={e => setDictSearchQuery(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter") lookupWord(); }}
                   placeholder="Look up a word…"
-                  style={{ flex: 1, fontSize: 15, background: C.bgSurface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "10px 14px", outline: "none", fontFamily: "inherit" }}
+                  style={{ flex: 1, fontSize: 15, background: C.bgSurface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "9px 12px", outline: "none", fontFamily: "inherit" }}
                 />
-                <button className="btn-primary" onClick={() => lookupWord()} disabled={dictSearching} style={{ padding: "0 18px", flexShrink: 0 }}>
+                <button className="btn-primary" onClick={() => lookupWord()} disabled={dictSearching} style={{ padding: "0 16px", flexShrink: 0, fontSize: 14 }}>
                   {dictSearching ? "…" : "Look Up"}
                 </button>
               </div>
-              {dictSearchError && <div style={{ fontSize: 13, color: C.rose, marginBottom: 8 }}>{dictSearchError}</div>}
+              {dictSearchError && <div style={{ fontSize: 13, color: C.rose, marginBottom: 6 }}>{dictSearchError}</div>}
               {dictSearchResult && (
-                <div className="vocab-card fade-up" style={{ marginBottom: 4 }}>
+                <div className="vocab-card fade-up" style={{ marginBottom: 4, padding: 16 }}>
                   <div style={{ position: "relative", zIndex: 1 }}>
-                    <div style={{ fontSize: 24, fontWeight: 600, marginBottom: 2 }}>{dictSearchResult.word}</div>
-                    {dictSearchResult.pronunciation && <div style={{ fontSize: 13, color: C.textDim, marginBottom: 2 }} className="mono">{dictSearchResult.pronunciation}</div>}
-                    {dictSearchResult.partOfSpeech && <div style={{ fontSize: 13, color: C.rose, fontStyle: "italic", marginBottom: 12 }}>{dictSearchResult.partOfSpeech}</div>}
-                    <div style={{ fontSize: 14, lineHeight: 1.7, color: C.text, marginBottom: 10 }} className="serif-body">{dictSearchResult.definition}</div>
-                    {dictSearchResult.example && <div style={{ fontSize: 13, color: C.textMid, fontStyle: "italic", lineHeight: 1.6, marginBottom: 10 }} className="serif-body">"{dictSearchResult.example}"</div>}
-                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                      <button className="btn-ghost" onClick={addSearchWordToDict} style={{ fontSize: 12, padding: "6px 12px" }}>
-                        {dictionary.some(w => w.word.toLowerCase() === dictSearchResult.word.toLowerCase()) ? "Already in lexicon" : "+ Add to Lexicon"}
-                      </button>
-                    </div>
+                    <div style={{ fontSize: 22, fontWeight: 600, marginBottom: 1 }}>{dictSearchResult.word}</div>
+                    {dictSearchResult.pronunciation && <div style={{ fontSize: 12, color: C.textDim, marginBottom: 1 }} className="mono">{dictSearchResult.pronunciation}</div>}
+                    {dictSearchResult.partOfSpeech && <div style={{ fontSize: 12, color: C.rose, fontStyle: "italic", marginBottom: 8 }}>{dictSearchResult.partOfSpeech}</div>}
+                    <div style={{ fontSize: 13, lineHeight: 1.6, color: C.text, marginBottom: 8 }} className="serif-body">{dictSearchResult.definition}</div>
+                    {dictSearchResult.example && <div style={{ fontSize: 12, color: C.textMid, fontStyle: "italic", lineHeight: 1.5, marginBottom: 6 }} className="serif-body">"{dictSearchResult.example}"</div>}
+                    <button className="btn-ghost" onClick={addSearchWordToDict} style={{ fontSize: 12, padding: "5px 10px" }}>
+                      {dictionary.some(w => w.word.toLowerCase() === dictSearchResult.word.toLowerCase()) ? "Already in lexicon" : "+ Add to Lexicon"}
+                    </button>
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="divider" />
+            <div className="divider" style={{ margin: "10px 0" }} />
 
             {dictionary.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "32px 16px" }}>
-                <div style={{ fontSize: 14, color: C.textMid, marginBottom: 16, lineHeight: 1.7 }} className="serif-body">Search words above to build your lexicon,<br/>or import a word list file.</div>
-                <button className="btn-ghost" onClick={() => dictInputRef.current?.click()} style={{ fontSize: 13, padding: "8px 16px" }}>Import Word List</button>
+              <div style={{ textAlign: "center", padding: "24px 16px" }}>
+                <div style={{ fontSize: 13, color: C.textMid, marginBottom: 12, lineHeight: 1.6 }} className="serif-body">Search words above to build your lexicon,<br/>or import a word list file.</div>
+                <button className="btn-ghost" onClick={() => dictInputRef.current?.click()} style={{ fontSize: 13, padding: "7px 14px" }}>Import Word List</button>
               </div>
             ) : (
               <>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, marginTop: 16 }}>
-                  <div style={{ fontSize: 12, color: C.textDim }} className="mono">{dictionary.length} words · {vocabHistory.length} learned</div>
-                  <button className="btn-ghost" onClick={() => dictInputRef.current?.click()} style={{ fontSize: 12, padding: "6px 12px" }}>Import / Replace</button>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, marginTop: 10 }}>
+                  <div style={{ fontSize: 11, color: C.textDim }} className="mono">{dictionary.length} words · {vocabHistory.length} learned</div>
+                  <button className="btn-ghost" onClick={() => dictInputRef.current?.click()} style={{ fontSize: 11, padding: "5px 10px" }}>Import / Replace</button>
                 </div>
                 {!wordReady && currentWord && (
-                  <div style={{ background: C.bgSurface, borderRadius: 12, padding: 14, marginBottom: 16, textAlign: "center", fontSize: 14, color: C.textMid, border: `1px solid ${C.border}` }}>
+                  <div style={{ background: C.bgSurface, borderRadius: 10, padding: 10, marginBottom: 10, textAlign: "center", fontSize: 13, color: C.textMid, border: `1px solid ${C.border}` }}>
                     Next word arrives in <span style={{ color: C.accent, fontWeight: 600 }}>{hrsLeft > 0 ? `${hrsLeft}h ${minsRem}m` : `${minsLeft}m`}</span>
                   </div>
                 )}
                 {(wordReady || !currentWord) && (
-                  <button className="btn-primary" onClick={getNewWord} disabled={loading} style={{ marginBottom: 20 }}>
+                  <button className="btn-primary" onClick={getNewWord} disabled={loading} style={{ marginBottom: 12, padding: "11px 18px" }}>
                     {loading ? "Searching the dictionary…" : currentWord ? "Turn Another Page" : "Your First Word Awaits"}
                   </button>
                 )}
                 {loading && <Spinner />}
                 {currentWord && !loading && (
-                  <div className="vocab-card fade-up" style={{ marginBottom: 22 }}>
+                  <div className="vocab-card fade-up" style={{ marginBottom: 14, padding: 18 }}>
                     <div style={{ position: "relative", zIndex: 1 }}>
-                      <div style={{ fontSize: 11, color: C.accent, fontWeight: 600, textTransform: "uppercase", letterSpacing: 2, marginBottom: 14 }} className="mono">Today's Word</div>
-                      <div style={{ fontSize: 30, fontWeight: 600, marginBottom: 2, letterSpacing: "0.5px" }}>{currentWord.word}</div>
-                      {currentWord.pronunciation && <div style={{ fontSize: 13, color: C.textDim, marginBottom: 2 }} className="mono">{currentWord.pronunciation}</div>}
-                      {currentWord.partOfSpeech && <div style={{ fontSize: 13, color: C.rose, fontStyle: "italic", marginBottom: 16 }}>{currentWord.partOfSpeech}</div>}
-                      <div style={{ fontSize: 15, lineHeight: 1.7, color: C.text, marginBottom: 16 }} className="serif-body">{currentWord.definition}</div>
-                      {currentWord.example && (<><div className="divider" /><div style={{ fontSize: 14, color: C.textMid, fontStyle: "italic", lineHeight: 1.6, marginBottom: 12 }} className="serif-body">"{currentWord.example}"</div></>)}
-                      {currentWord.etymology && <div style={{ fontSize: 13, color: C.textDim, lineHeight: 1.5 }} className="serif-body"><span style={{ color: C.gold }}>Origin</span> — {currentWord.etymology}</div>}
-                      {currentWord.mnemonic && <div style={{ fontSize: 13, color: C.textDim, lineHeight: 1.5, marginTop: 8 }} className="serif-body"><span style={{ color: C.accent }}>Remember</span> — {currentWord.mnemonic}</div>}
+                      <div style={{ fontSize: 10, color: C.accent, fontWeight: 600, textTransform: "uppercase", letterSpacing: 2, marginBottom: 8 }} className="mono">Today's Word</div>
+                      <div style={{ fontSize: 26, fontWeight: 600, marginBottom: 1, letterSpacing: "0.3px" }}>{currentWord.word}</div>
+                      {currentWord.pronunciation && <div style={{ fontSize: 12, color: C.textDim, marginBottom: 1 }} className="mono">{currentWord.pronunciation}</div>}
+                      {currentWord.partOfSpeech && <div style={{ fontSize: 12, color: C.rose, fontStyle: "italic", marginBottom: 10 }}>{currentWord.partOfSpeech}</div>}
+                      <div style={{ fontSize: 14, lineHeight: 1.6, color: C.text, marginBottom: 10 }} className="serif-body">{currentWord.definition}</div>
+                      {currentWord.example && (<><div className="divider" style={{ margin: "8px 0" }} /><div style={{ fontSize: 13, color: C.textMid, fontStyle: "italic", lineHeight: 1.5, marginBottom: 8 }} className="serif-body">"{currentWord.example}"</div></>)}
+                      {currentWord.etymology && <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.4 }} className="serif-body"><span style={{ color: C.gold }}>Origin</span> — {currentWord.etymology}</div>}
+                      {currentWord.mnemonic && <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.4, marginTop: 6 }} className="serif-body"><span style={{ color: C.accent }}>Remember</span> — {currentWord.mnemonic}</div>}
                     </div>
                   </div>
                 )}
                 {vocabHistory.length > 1 && (
                   <>
-                    <div className="divider-ornament">· · ·</div>
-                    <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: C.textMid, fontStyle: "italic" }}>Words you've collected</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div className="divider-ornament" style={{ margin: "12px 0" }}>· · ·</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: C.textMid, fontStyle: "italic" }}>Words you've collected</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {vocabHistory.slice(1, 11).map((w, i) => (
-                        <div key={i} className="card" style={{ padding: 14 }}>
+                        <div key={i} className="card" style={{ padding: 10 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ fontSize: 16, fontWeight: 600 }}>{w.word}</span>
-                            <span style={{ fontSize: 11, color: C.textDim }} className="mono">{w.partOfSpeech}</span>
+                            <span style={{ fontSize: 15, fontWeight: 600 }}>{w.word}</span>
+                            <span style={{ fontSize: 10, color: C.textDim }} className="mono">{w.partOfSpeech}</span>
                           </div>
-                          <div style={{ fontSize: 13, color: C.textMid, marginTop: 4, lineHeight: 1.5 }} className="serif-body">{w.definition}</div>
+                          <div style={{ fontSize: 12, color: C.textMid, marginTop: 3, lineHeight: 1.4 }} className="serif-body">{w.definition}</div>
                         </div>
                       ))}
                     </div>
@@ -1312,13 +1310,6 @@ export default function BiblionApp() {
             <div className="card" style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, fontStyle: "italic" }}>About Biblion</div>
               <div style={{ fontSize: 14, color: C.textMid, lineHeight: 1.7 }} className="serif-body">A candlelit corner of the internet where your books yield their secrets, one insight at a time. Powered by DeepSeek.</div>
-            </div>
-            <div className="card" style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 10, fontStyle: "italic" }}>Dictionary Format</div>
-              <div style={{ fontSize: 14, color: C.textMid, lineHeight: 1.7, marginBottom: 12 }} className="serif-body">A plain text file, one word per line. Definitions are optional — separate with a colon or tab.</div>
-              <div className="mono" style={{ color: C.textDim, lineHeight: 1.8, padding: "10px 14px", background: C.bgInset, borderRadius: 8 }}>
-                ephemeral: lasting briefly<br/>quotidian: daily, ordinary<br/>perspicacious: keenly perceptive
-              </div>
             </div>
             <div className="card" style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 10, fontStyle: "italic" }}>Your Collection</div>
