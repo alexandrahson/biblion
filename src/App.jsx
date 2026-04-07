@@ -455,9 +455,9 @@ export default function BiblionApp() {
   // ── Load from localStorage/IndexedDB + handle OAuth redirect ──
   useEffect(() => {
     loadBooks().then(b => { if (b?.length) setBooks(b); }).catch(e => console.warn("Failed to load books:", e));
-    const d = store.get("biblion-dict"); if (d) setDictionary(d);
-    const v = store.get("biblion-vocab-history"); if (v) setVocabHistory(v);
-    const cw = store.get("biblion-current-word"); if (cw) setCurrentWord(cw);
+    const d = store.get("biblion-dict"); if (d) setDictionary(d.map(item => ({ ...item, definition: smartenQuotes(item.definition || "") })));
+    const v = store.get("biblion-vocab-history"); if (v) setVocabHistory(v.map(item => ({ ...item, definition: smartenQuotes(item.definition || ""), example: smartenQuotes(item.example || ""), etymology: smartenQuotes(item.etymology || ""), mnemonic: smartenQuotes(item.mnemonic || "") })));
+    const cw = store.get("biblion-current-word"); if (cw) setCurrentWord({ ...cw, definition: smartenQuotes(cw.definition || ""), example: smartenQuotes(cw.example || ""), etymology: smartenQuotes(cw.etymology || ""), mnemonic: smartenQuotes(cw.mnemonic || "") });
     const lt = store.get("biblion-last-word-time"); if (lt) setLastWordTime(lt);
     const k = store.get("biblion-api-key"); if (k) setApiKey(k);
     const sp = store.get("biblion-saved-passages"); if (sp) setSavedPassages(sp);
@@ -584,7 +584,7 @@ export default function BiblionApp() {
       const definition = firstMeaning.definitions?.[0]?.definition || "";
       const example = firstMeaning.definitions?.[0]?.example || "";
       const allDefs = meanings.map(m => `(${m.partOfSpeech}) ${m.definitions?.[0]?.definition || ""}`).join("; ");
-      setDictSearchResult({ word: entry.word, pronunciation: phonetic, partOfSpeech, definition, allDefinitions: allDefs, example });
+      setDictSearchResult({ word: entry.word, pronunciation: phonetic, partOfSpeech, definition: smartenQuotes(definition), allDefinitions: smartenQuotes(allDefs), example: smartenQuotes(example) });
     } catch (err) { setDictSearchError("Network error. Check your connection."); }
     setDictSearching(false);
   };
@@ -593,7 +593,7 @@ export default function BiblionApp() {
     if (!dictSearchResult) return;
     const exists = dictionary.some(w => w.word.toLowerCase() === dictSearchResult.word.toLowerCase());
     if (exists) return;
-    const updated = [...dictionary, { word: dictSearchResult.word, definition: dictSearchResult.allDefinitions || dictSearchResult.definition }];
+    const updated = [...dictionary, { word: dictSearchResult.word, definition: smartenQuotes(dictSearchResult.allDefinitions || dictSearchResult.definition) }];
     setDictionary(updated); persist("biblion-dict", updated);
   };
 
@@ -639,11 +639,12 @@ export default function BiblionApp() {
       const usr = `Teach me: "${pick.word}"${pick.definition ? ` (${pick.definition})` : ""}`;
       const raw = await askAI(sys, usr, apiKey);
       const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
-      setCurrentWord(parsed); persist("biblion-current-word", parsed);
+      const normalized = { ...parsed, definition: smartenQuotes(parsed.definition || ""), example: smartenQuotes(parsed.example || ""), etymology: smartenQuotes(parsed.etymology || ""), mnemonic: smartenQuotes(parsed.mnemonic || "") };
+      setCurrentWord(normalized); persist("biblion-current-word", normalized);
       const now = Date.now(); setLastWordTime(now); persist("biblion-last-word-time", now);
-      const hist = [{ ...parsed, learnedAt: new Date().toISOString() }, ...vocabHistory].slice(0, 100);
+      const hist = [{ ...normalized, learnedAt: new Date().toISOString() }, ...vocabHistory].slice(0, 100);
       setVocabHistory(hist); persist("biblion-vocab-history", hist);
-    } catch (err) { setCurrentWord({ word: pick.word, definition: pick.definition || "", pronunciation: "", partOfSpeech: "", etymology: "", example: "", mnemonic: err.message }); }
+    } catch (err) { setCurrentWord({ word: pick.word, definition: smartenQuotes(pick.definition || ""), pronunciation: "", partOfSpeech: "", etymology: "", example: "", mnemonic: smartenQuotes(err.message) }); }
     setLoading(false);
   };
 
