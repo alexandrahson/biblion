@@ -314,22 +314,32 @@ function smartenQuotes(text) {
 }
 
 // Render text with tappable words, keeping punctuation visually attached to adjacent words
-function renderTappableWords(text, onTap, color) {
+function renderInlineText(text, onTap, color) {
   const smart = smartenQuotes(text || "");
+  const segments = smart.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
   const wordRe = /(\b[A-Za-z][A-Za-z’'-]*\b)/g;
-  return smart.split(/(\s+)/).map((token, i) => {
-    if (/^\s+$/.test(token)) return <span key={i}>{token}</span>;
-    const parts = token.split(wordRe);
-    if (parts.length <= 1) return <span key={i} style={{ whiteSpace: "nowrap" }}>{token}</span>;
-    return (
-      <span key={i} style={{ whiteSpace: "nowrap" }}>
-        {parts.map((p, j) =>
-          /^[A-Za-z][A-Za-z’'-]*$/.test(p)
-            ? <button key={j} onClick={() => onTap?.(p.replace(/[’']/g, ""))} style={{ background: "none", border: "none", color, padding: 0, margin: 0, font: "inherit", cursor: "pointer" }}>{p}</button>
-            : p ? <span key={j}>{p}</span> : null
-        )}
-      </span>
-    );
+
+  const renderToken = (token, keyPrefix, fontWeight) => {
+    return token.split(/(\s+)/).map((piece, i) => {
+      if (/^\s+$/.test(piece)) return <span key={`${keyPrefix}-s-${i}`}>{piece}</span>;
+      const parts = piece.split(wordRe);
+      if (parts.length <= 1) return <span key={`${keyPrefix}-p-${i}`} style={{ whiteSpace: "nowrap", fontWeight }}>{piece}</span>;
+      return (
+        <span key={`${keyPrefix}-w-${i}`} style={{ whiteSpace: "nowrap", fontWeight }}>
+          {parts.map((p, j) =>
+            /^[A-Za-z][A-Za-z’'-]*$/.test(p)
+              ? <button key={j} onClick={() => onTap?.(p.replace(/[’']/g, ""))} style={{ background: "none", border: "none", color, padding: 0, margin: 0, font: "inherit", fontWeight, cursor: "pointer" }}>{p}</button>
+              : p ? <span key={j}>{p}</span> : null
+          )}
+        </span>
+      );
+    });
+  };
+
+  return segments.map((segment, idx) => {
+    const isBold = /^\*\*[^*]+\*\*$/.test(segment);
+    const content = isBold ? segment.slice(2, -2) : segment;
+    return <span key={`seg-${idx}`}>{renderToken(content, `seg-${idx}`, isBold ? 700 : undefined)}</span>;
   });
 }
 
@@ -386,7 +396,7 @@ function ReaderView({ book, chapterIdx, chapters, chunkIdx, onClose, onChapterCh
           <>
             <div style={{ fontSize: 13, color: C.rose, fontWeight: 600, textTransform: "uppercase", letterSpacing: 2, marginBottom: 8, fontFamily: "'JetBrains Mono', monospace" }}>{chapter.chapterTitle}</div>
             <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 20 }}>{chunk.chunkLabel}</div>
-            <div style={{ fontSize: 17, color: C.text, lineHeight: 1.7, fontFamily: "'Libre Baskerville', Georgia, serif", whiteSpace: "pre-wrap" }}>{renderTappableWords(chunk.content, onWordTap, C.text)}</div>
+            <div style={{ fontSize: 17, color: C.text, lineHeight: 1.7, fontFamily: "'Libre Baskerville', Georgia, serif", whiteSpace: "pre-wrap" }}>{renderInlineText(chunk.content, onWordTap, C.text)}</div>
           </>
         ) : (
           <div style={{ textAlign: "center", padding: 40, color: C.textDim, fontStyle: "italic" }}>No content available</div>
@@ -1197,7 +1207,7 @@ export default function BiblionApp() {
                   <div style={{ position: "relative", zIndex: 1 }}>
                     <div style={{ fontSize: 11, color: C.rose, fontWeight: 600, textTransform: "uppercase", letterSpacing: 2, marginBottom: 14 }} className="mono">Passage</div>
                     <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 12, lineHeight: 1.35 }}>{insight.title}</div>
-                    <div style={{ fontSize: 15, color: C.textMid, lineHeight: 1.75, marginBottom: 14 }} className="serif-body">{renderTappableWords(insight.body, (w) => lookupWord(w, { openModal: true }), C.textMid)}</div>
+                    <div style={{ fontSize: 15, color: C.textMid, lineHeight: 1.75, marginBottom: 14 }} className="serif-body">{renderInlineText(insight.body, (w) => lookupWord(w, { openModal: true }), C.textMid)}</div>
                     {insight.page_hint && <div style={{ fontSize: 11, color: C.textDim }} className="mono">◆ {insight.page_hint}</div>}
                     {insight.reflection && (<><div className="divider" /><div style={{ fontSize: 14, color: C.gold, fontStyle: "italic", lineHeight: 1.6 }} className="serif-body">{insight.reflection}</div></>)}
                   </div>
