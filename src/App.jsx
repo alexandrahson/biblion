@@ -642,8 +642,8 @@ export default function BiblionApp() {
     if (!dictionary.length) return;
     if (!ensureApiKey()) return;
     setLoading(true);
-    const used = vocabHistory.map(v => v.word);
-    const pool = dictionary.filter(w => !used.includes(w.word));
+    const used = new Set(vocabHistory.map(v => v.word.toLowerCase()));
+    const pool = dictionary.filter(w => !used.has(w.word.toLowerCase()));
     const src = pool.length > 0 ? pool : dictionary;
     const pick = src[Math.floor(Math.random() * src.length)];
     try {
@@ -1285,23 +1285,6 @@ export default function BiblionApp() {
                       {currentWord.etymology && <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.4 }} className="serif-body"><span style={{ color: C.gold }}>Origin</span> — {renderInlineText(currentWord.etymology, (w) => lookupWord(w, { openModal: true }), C.textDim)}</div>}
                     </div>
                   </div>
-                )}
-                {vocabHistory.length > 1 && (
-                  <>
-                    <div className="divider-ornament" style={{ margin: "20px 0 22px" }}>· · ·</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 18, color: C.textMid, fontStyle: "italic" }}>Words you’ve collected</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingBottom: 32 }}>
-                      {vocabHistory.slice(1, 11).map((w, i) => (
-                        <div key={i} className="card" style={{ padding: 10 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ fontSize: 15, fontWeight: 600 }}>{w.word}</span>
-                            <span style={{ fontSize: 10, color: C.textDim }} className="mono">{w.partOfSpeech}</span>
-                          </div>
-                          <div style={{ fontSize: 12, color: C.textMid, marginTop: 3, lineHeight: 1.4 }} className="serif-body">{smartenQuotes(w.definition)}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
                 )}
               </>
             )}
