@@ -1360,23 +1360,27 @@ export default function BiblionApp() {
                   {apiBalanceError && (
                     <div style={{ fontSize: 12, color: C.rose, lineHeight: 1.6 }} className="serif-body">{apiBalanceError}</div>
                   )}
-                  {apiBalanceInfo?.balance_infos?.length > 0 && (
+                  {apiBalanceInfo && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {apiBalanceInfo.balance_infos.map((info, idx) => {
-                        const low = balanceLooksLow(info);
-                        return (
-                          <div key={`${info.currency}-${idx}`} style={{ background: C.bgInset, border: `1px solid ${low ? C.rose : C.border}`, borderRadius: 8, padding: "10px 12px" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                              <span style={{ fontSize: 12, color: C.textDim }} className="mono">{info.currency}</span>
-                              <span style={{ fontSize: 12, color: low || apiBalanceInfo.is_available === false ? C.rose : C.accent, fontWeight: 600 }}>
-                                {apiBalanceInfo.is_available === false ? "Balance too low" : low ? "Running low" : "Balance looks fine"}
-                              </span>
+                      {apiBalanceInfo.balance_infos?.length > 0 ? (
+                        apiBalanceInfo.balance_infos.map((info, idx) => {
+                          const low = balanceLooksLow(info);
+                          return (
+                            <div key={`${info.currency}-${idx}`} style={{ background: C.bgInset, border: `1px solid ${low ? C.rose : C.border}`, borderRadius: 8, padding: "10px 12px" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                                <span style={{ fontSize: 12, color: C.textDim }} className="mono">{info.currency}</span>
+                                <span style={{ fontSize: 12, color: low || apiBalanceInfo.is_available === false ? C.rose : C.accent, fontWeight: 600 }}>
+                                  {apiBalanceInfo.is_available === false ? "Balance too low" : low ? "Running low" : "Balance looks fine"}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: 14, color: C.text, marginBottom: 4 }} className="serif-body">Available balance: {info.total_balance} {info.currency}</div>
+                              <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.6 }} className="mono">Granted: {info.granted_balance} · Topped up: {info.topped_up_balance}</div>
                             </div>
-                            <div style={{ fontSize: 14, color: C.text, marginBottom: 4 }} className="serif-body">Available balance: {info.total_balance} {info.currency}</div>
-                            <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.6 }} className="mono">Granted: {info.granted_balance} · Topped up: {info.topped_up_balance}</div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })
+                      ) : (
+                        <div style={{ fontSize: 12, color: C.textMid, lineHeight: 1.6, background: C.bgInset, borderRadius: 8, padding: "10px 12px", whiteSpace: "pre-wrap", wordBreak: "break-all" }} className="mono">{JSON.stringify(apiBalanceInfo, null, 2)}</div>
+                      )}
                     </div>
                   )}
                 </div>
