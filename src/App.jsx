@@ -1433,6 +1433,7 @@ export default function BiblionApp() {
                 }
               }}>Clear All Data</button>
             </div>
+            <div style={{ fontSize: 12, color: C.textDim, textAlign: "center", marginTop: 20, fontStyle: "italic" }} className="serif-body">Clawlex was here</div>
             <div style={{ height: 24 }} />
           </div>
         )}
